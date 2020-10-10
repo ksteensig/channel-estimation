@@ -1,38 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 import numpy.random as rand
-#import scipy.io
-
-# needs an SNR parameter, to compute the noise variance
-def generate_los_ula_data(N, K, T, f):
-    c = 3e8 # speed of light
-    wl = c/f # wavelength (lambda)
-    d = wl/2 # uniform distance between antennas
-    
-    theta = rand.uniform(0, np.pi, (K,1))
-    
-    # make this complex normal distributed
-    alpha = rand.uniform(size=(K,1))
-    
-    H = np.zeros((N,K), dtype = 'complex_')
-
-    spatial_const = 2j*np.pi*d/wl
-    
-    for n in range(N):
-        for k in range(K):
-            angle = theta[k]
-            attenuation = alpha[k]
-            H[n,k] = attenuation*np.exp(spatial_const*np.cos(angle))
-            
-    S = 100*np.ones((K,T)) #rand.randn(K,5)
-    
-    # should be complex normal
-    N = rand.randn(N,T)
-    
-    # y = Hs + n
-    Y = H.dot(S) + N
-    
-    return theta,S,Y
+from data_gen import generate_los_ula_data
 
 
 def esprit(Y, N, K, f):
@@ -62,6 +31,8 @@ def esprit(Y, N, K, f):
     # E = eigenvalues, Q = eigenvectors
     eigs,_ = la.eig(P)
     
+    print(np.angle(eigs)/(2*np.pi*N*d))
+    
     return np.arccos(np.angle(eigs)/(2*np.pi*N*d))
 
 
@@ -71,10 +42,12 @@ N = 5
 K = 2
 # samples
 T = 5
+#SNR
+SNR = rand.uniform(1,50)
 # frequency
-f = 1e9
+f = rand.uniform(2.4e9)
 
-theta,S,Y = generate_los_ula_data(N, K, T, f)
+theta,S,Y = generate_los_ula_data(N, K, T, SNR, f)
 
 theta_hat = esprit(Y, N, K, f)
 

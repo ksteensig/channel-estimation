@@ -11,7 +11,7 @@ print(tf.__version__)
 
 # load data
 #fashion_mnist = keras.datasets.fashion_mnist
-(train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
+#(train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
 
 
 
@@ -40,7 +40,7 @@ model = keras.Sequential([
     keras.layers.Dropout(p),
     keras.layers.Dense(200, activation='relu'),
     keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense(K, activation='sigmoid')
+    keras.layers.Dense(K, activation='linear')
 ])
 
 training = []
@@ -55,15 +55,25 @@ training = np.array(training)
 labels = np.array(labels)
 
 
-model.compile(optimizer='sgd',
+model.compile(optimizer='adam',
               loss=tf.keras.losses.MeanSquaredError(),
-              metrics=['accuracy'])
+              metrics=['mean_squared_error'])
 
 
 model.fit(training, labels, epochs=10)
 
-"""
-test_loss, test_acc = model.evaluate(test_images,  test_labels, verbose=2)
 
-print('\nTest accuracy:', test_acc)
-"""
+testing = []
+labels = []
+
+for i in range(10000):
+    label,_,test = generate_los_ula_data(N, K, 1, 20, f)
+    testing.append(test.T)
+    labels.append(label.T)
+    
+testing = np.array(testing)
+labels = np.array(labels)
+
+test_loss, mse = model.evaluate(testing,  labels, verbose=2)
+
+print('\n MSE:', mse)

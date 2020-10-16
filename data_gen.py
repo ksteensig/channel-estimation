@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.random as rand
-#import scipy.io
+import numpy.linalg as la
+import matplotlib.pyplot as plt
 
 # needs an SNR parameter, to compute the noise variance
 def generate_los_ula_data(N, K, T, SNR, f):
@@ -14,17 +15,47 @@ def generate_los_ula_data(N, K, T, SNR, f):
     
     H = np.zeros((N,K), dtype = 'complex_')
 
-    spatial_const = 2j*np.pi*d/wl
+    spatial_const = -2j*np.pi*d/wl
     
-    for n in range(N):
-        for k in range(K):
-            H[n,k] = alpha[k]*np.exp(spatial_const*np.cos(theta[k]))
-            
-    Signal = SNR*rand.randn(K,T)
+    for k in range(K):
+        for n in range(N):
+            H[n,k] = alpha[k]*np.exp(spatial_const*n*np.cos(theta[k]))
+    
+    Signal = np.ones((K,T))
     
     Noise = rand.randn(N,T*2).view(np.complex128)
     
     # y = Hs + n
-    Received = H.dot(Signal) + Noise
+    Received = H.dot(Signal) + Noise/3
     
     return theta,Signal,Received
+
+"""
+# antennas
+N = 32
+
+# users
+K = 8
+
+# frequency
+f = 1e9
+
+SNR = 10
+
+training = []
+labels = []
+
+for i in range(200):
+    label,_,train = generate_los_ula_data(N, K, 1, SNR, f)
+    training.append(train.T)
+    labels.append(label.T)
+    
+training = np.array(training)
+labels = np.array(labels)
+
+C = np.cov(training.reshape(200,N).T)
+
+E,U = la.eig(C)
+
+plt.plot(np.abs(E))
+"""

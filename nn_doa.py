@@ -5,6 +5,8 @@ import tensorflow as tf
 from tensorflow import keras
 import numpy as np
 
+from sklearn.model_selection import train_test_split
+
 from data_gen import generate_los_ula_data
 
 print(tf.__version__)
@@ -31,18 +33,22 @@ K = 8
 # frequency
 f = 1e9
 
-training = []
-labels = []
+# bits
+L = 1
 
-for i in range(40000):
-    label,_,train = generate_los_ula_data(N, K, 1, 10, f)
-    training.append(train.T)
-    labels.append(label.T)
-    
-training = np.array(training)
-labels = np.array(labels)
+training_size = 80000
+
+training = np.zeros((training_size,L,N), dtype='complex128')
+labels = np.zeros((training_size,L,K), dtype='complex128')
+
+for i in range(training_size):
+    label,_,train = generate_los_ula_data(N, K, L, 10, f)
+    training[i,:L,:N] = train.T
+    labels[i,:L,:K] = label.T
 
 training = training/abs(np.max(training))
+labels = labels/np.pi
+
 
 # define model
 model = keras.Sequential([
@@ -54,21 +60,21 @@ model = keras.Sequential([
     keras.layers.GaussianNoise(1),
     keras.layers.Dense(200, activation='relu'),
     keras.layers.Dense(128, activation='relu'),
-    keras.layers.Dense(K, activation='linear')
+    keras.layers.Dense(K, activation='sigmoid')
 ])
     
 
 # using Adam doesn't require normalizing the data
 opt = keras.optimizers.SGD(learning_rate=0.024, decay=0.96)
 
-model.compile(optimizer=opt,
-              loss=tf.keras.losses.MeanSquaredError(),
-              metrics=['mean_squared_error'])
+model.compile(optimizer='sgd',
+              loss='mse',
+              metrics=[tf.keras.metrics.MeanSquaredError()])
 
 
-model.fit(training, labels, batch_size=1200, epochs=20)
+model.fit(training, labels, batch_size=66, epochs=2000)
 
-"""
+
 testing = []
 labels = []
 
@@ -80,9 +86,10 @@ for i in range(10000):
 testing = np.array(testing)
 labels = np.array(labels)
 
-testing = testing/np.max(testing)
+testing = testing/abs(np.max(testing))
+labels = labels/np.pi
 
 test_loss, mse = model.evaluate(testing,  labels, verbose=2)
 
 print('\n MSE:', mse)
-"""
+

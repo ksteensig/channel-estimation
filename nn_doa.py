@@ -34,19 +34,26 @@ K = 8
 f = 1e9
 
 # bits
-L = 1
+L = 16
 
-training_size = 80000
+# snr
+snr = 10
+
+training_size = 60000
+validation_size = 20000
 
 training = np.zeros((training_size,L,N), dtype='complex128')
 labels = np.zeros((training_size,L,K), dtype='complex128')
 
 for i in range(training_size):
-    label,_,train = generate_los_ula_data(N, K, L, 10, f)
+    label,train = generate_los_ula_data(N, K, L, snr, f)
     training[i,:L,:N] = train.T
-    labels[i,:L,:K] = label.T
+    labels[i,:L,:K] = label
 
-training = training/abs(np.max(training))
+training = training.reshape(training_size*L, N)
+labels = labels.reshape(training_size*L, K)
+
+training = training/np.max(abs(training))
 labels = labels/np.pi
 
 
@@ -56,8 +63,8 @@ model = keras.Sequential([
     keras.layers.Dense(256, activation='relu'),
     keras.layers.Dense(300, activation='relu'),
     keras.layers.Dense(256, activation='relu'),
-    keras.layers.Dropout(0.1, input_shape=(200,)),
-    keras.layers.GaussianNoise(1),
+    keras.layers.Dropout(0.9, input_shape=(200,)),
+    keras.layers.GaussianNoise(0.1),
     keras.layers.Dense(200, activation='relu'),
     keras.layers.Dense(128, activation='relu'),
     keras.layers.Dense(K, activation='sigmoid')
@@ -67,19 +74,20 @@ model = keras.Sequential([
 # using Adam doesn't require normalizing the data
 opt = keras.optimizers.SGD(learning_rate=0.024, decay=0.96)
 
-model.compile(optimizer='sgd',
+model.compile(optimizer=opt,
               loss='mse',
               metrics=[tf.keras.metrics.MeanSquaredError()])
 
+batch_size = int(((training_size-validation_size)*L)/1200)
 
-model.fit(training, labels, batch_size=66, epochs=2000)
+model.fit(training, labels, batch_size=batch_size, epochs=10)
 
-
+"""
 testing = []
 labels = []
 
 for i in range(10000):
-    label,_,test = generate_los_ula_data(N, K, 1, 10, f)
+    label,test = generate_los_ula_data(N, K, L, 10, f)
     testing.append(np.abs(test.T))
     labels.append(label.T)
     
@@ -92,4 +100,4 @@ labels = labels/np.pi
 test_loss, mse = model.evaluate(testing,  labels, verbose=2)
 
 print('\n MSE:', mse)
-
+"""

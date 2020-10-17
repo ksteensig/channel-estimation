@@ -9,23 +9,10 @@ import matplotlib.pyplot as plt
 
 from data_gen import generate_los_ula_data
 
-print(tf.__version__)
-
-
-
-
-# load data
-#fashion_mnist = keras.datasets.fashion_mnist
-#(train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
-
-
-
-# normalize data
-#train_images = train_images / 255.0
-#test_images = test_images / 255.0
+print('TensorFlow Version:', tf.__version__)
 
 # antennas
-N = 32
+N = 128
 
 # users
 K = 8
@@ -34,13 +21,13 @@ K = 8
 f = 1e9
 
 # bits
-L = 1
+L = 16
 
 # snr between 5 and 30
-snr = 10 #[10,10]
+snr = [5, 30]
 
-training_size = 10000
-validation_size = 5000
+training_size = 50000
+validation_size = 10000
 
 data = np.zeros((training_size,L,N), dtype='complex128')
 labels = np.zeros((training_size,L,K), dtype='complex128')
@@ -54,7 +41,7 @@ data = data.reshape(training_size*L, N)
 labels = labels.reshape(training_size*L, K)
 
 data = data/np.max(abs(data))
-labels = labels/np.pi
+labels = labels/np.pi # normalize labels to [0,1]
 
 test_size=validation_size/training_size
 
@@ -82,9 +69,6 @@ model.compile(optimizer=opt,
               metrics=[tf.keras.metrics.MeanSquaredError()])
 
 batch_size = int(((training_size-validation_size)*L)/1200)
-
-model.fit(t_data, t_labels, batch_size=batch_size, epochs=100, validation_data=(v_data, v_labels))
-
 
 epochs = 50
 

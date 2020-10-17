@@ -8,12 +8,13 @@ def array_response_vector(array,theta):
     v = np.exp(1j*2*np.pi*array*np.sin(theta))
     return v/np.sqrt(N)
 
-# needs an SNR parameter, to compute the noise variance
 def generate_los_ula_data(N, K, T, SNR, f):
     c = 3e8 # speed of light
     wl = c/f # wavelength (lambda)
     d = wl/2 # uniform distance between antennas
     theta = rand.uniform(-np.pi/2, np.pi/2, (K))
+
+    snr = 10 #rand.uniform(SNR[0], SNR[1])
     
     array = np.linspace(0,N-1,N)*d/wl
 
@@ -27,7 +28,7 @@ def generate_los_ula_data(N, K, T, SNR, f):
         for i in range(K):
             pha = np.exp(1j*2*np.pi*np.random.rand(1))
             htmp = htmp + alpha[i]*pha*array_response_vector(array,theta[i])
-        H[:,iter] = htmp + np.sqrt(0.5/SNR)*(np.random.randn(N)+np.random.randn(N)*1j)
+        H[:,iter] = htmp + np.sqrt(0.5/snr)*(np.random.randn(N)+np.random.randn(N)*1j)
 
     theta = np.repeat(theta, T).reshape(K,T).T
 
@@ -55,7 +56,7 @@ T = 16
 # frequency
 f = 1e9
 
-SNR = 30
+SNR = [10,10]
 
 #np.random.seed(1)
 
@@ -77,6 +78,7 @@ print(mse)
 
 E,U = la.eig(CovMat)
 
-plt.plot(np.abs(E))
-plt.show()
+#plt.plot(np.abs(E))
+#plt.show()
 """
+

@@ -1,11 +1,11 @@
 import os
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
-
 from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 
 from data_gen import generate_los_ula_data
 
@@ -25,7 +25,7 @@ print(tf.__version__)
 #test_images = test_images / 255.0
 
 # antennas
-N = 128
+N = 32
 
 # users
 K = 8
@@ -34,28 +34,31 @@ K = 8
 f = 1e9
 
 # bits
-L = 16
+L = 1
 
-# snr
-snr = 10
+# snr between 5 and 30
+snr = 10 #[10,10]
 
-training_size = 60000
-validation_size = 20000
+training_size = 10000
+validation_size = 5000
 
-training = np.zeros((training_size,L,N), dtype='complex128')
+data = np.zeros((training_size,L,N), dtype='complex128')
 labels = np.zeros((training_size,L,K), dtype='complex128')
 
 for i in range(training_size):
-    label,train = generate_los_ula_data(N, K, L, snr, f)
-    training[i,:L,:N] = train.T
-    labels[i,:L,:K] = label
+    l,d = generate_los_ula_data(N, K, L, snr, f)
+    data[i,:L,:N] = d.T
+    labels[i,:L,:K] = l
 
-training = training.reshape(training_size*L, N)
+data = data.reshape(training_size*L, N)
 labels = labels.reshape(training_size*L, K)
 
-training = training/np.max(abs(training))
+data = data/np.max(abs(data))
 labels = labels/np.pi
 
+test_size=validation_size/training_size
+
+t_data, v_data, t_labels, v_labels = train_test_split(data, labels, test_size=test_size, shuffle=False)
 
 # define model
 model = keras.Sequential([
@@ -63,7 +66,7 @@ model = keras.Sequential([
     keras.layers.Dense(256, activation='relu'),
     keras.layers.Dense(300, activation='relu'),
     keras.layers.Dense(256, activation='relu'),
-    keras.layers.Dropout(0.9, input_shape=(200,)),
+    keras.layers.Dropout(0.1, input_shape=(200,)),
     keras.layers.GaussianNoise(0.1),
     keras.layers.Dense(200, activation='relu'),
     keras.layers.Dense(128, activation='relu'),
@@ -80,7 +83,19 @@ model.compile(optimizer=opt,
 
 batch_size = int(((training_size-validation_size)*L)/1200)
 
-model.fit(training, labels, batch_size=batch_size, epochs=10)
+model.fit(t_data, t_labels, batch_size=batch_size, epochs=100, validation_data=(v_data, v_labels))
+
+
+epochs = 50
+
+t_mse = np.zeros((epochs,1))
+v_mse = np.zeros((epochs,1))
+
+for i in range(epochs):
+    m = model.fit(t_data, t_labels, batch_size=batch_size, epochs=1, validation_data=(v_data, v_labels))
+    t_mse[i] = m.history['mean_squared_error'][0]
+    v_mse[i] = m.history['val_mean_squared_error'][0]
+    
 
 """
 testing = []

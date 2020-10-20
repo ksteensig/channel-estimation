@@ -26,8 +26,8 @@ L = 16
 # snr between 5 and 30
 snr = [5, 30]
 
-training_size = 50000
-validation_size = 10000
+training_size = 25000
+validation_size = 5000
 
 data = np.zeros((training_size,L,N), dtype='complex128')
 labels = np.zeros((training_size,L,K), dtype='complex128')
@@ -45,7 +45,7 @@ labels = labels/np.pi # normalize labels to [0,1]
 
 test_size=validation_size/training_size
 
-t_data, v_data, t_labels, v_labels = train_test_split(data, labels, test_size=test_size, shuffle=False)
+t_data, v_data, t_labels, v_labels = train_test_split(data, labels, test_size=test_size, shuffle=True)
 
 # define model
 model = keras.Sequential([
@@ -62,24 +62,17 @@ model = keras.Sequential([
     
 
 # using Adam doesn't require normalizing the data
-opt = keras.optimizers.SGD(learning_rate=0.024, decay=0.96)
+opt = keras.optimizers.SGD(learning_rate=0.01, momentum=0.01)
 
 model.compile(optimizer=opt,
               loss='mse',
               metrics=[tf.keras.metrics.MeanSquaredError()])
 
-batch_size = int(((training_size-validation_size)*L)/1200)
+m = model.fit(t_data, t_labels, batch_size=1200, epochs=40, validation_data=(v_data, v_labels))
 
-epochs = 50
-
-t_mse = np.zeros((epochs,1))
-v_mse = np.zeros((epochs,1))
-
-for i in range(epochs):
-    m = model.fit(t_data, t_labels, batch_size=batch_size, epochs=1, validation_data=(v_data, v_labels))
-    t_mse[i] = m.history['mean_squared_error'][0]
-    v_mse[i] = m.history['val_mean_squared_error'][0]
-    
+plt.plot(m.history['mean_squared_error'], 'r')
+plt.plot(m.history['val_mean_squared_error'], 'b')
+plt.show()
 
 """
 testing = []

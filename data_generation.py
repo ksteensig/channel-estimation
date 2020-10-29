@@ -2,6 +2,9 @@ import numpy as np
 import numpy.random as rand
 from os.path import isfile
 
+min_theta = -np.pi/2
+max_theta = np.pi/2
+
 # SNR is a range between min and max SNR in dB
 def generate_single_data(N, K, L, f):
     c = 3e8 # speed of light
@@ -12,10 +15,9 @@ def generate_single_data(N, K, L, f):
     array = np.linspace(0,N-1,N)*d/wl
     
     # steering vector
-    array_response = lambda array,theta: np.exp(-1j*2*np.pi*array*np.cos(theta))
+    array_response = lambda array,theta: np.exp(-1j*2*np.pi*array*np.sin(theta))*np.sqrt(1/N)
 
-    theta = np.sort(np.pi*np.random.rand(K,1), axis=0)
-    alpha = (np.random.randn(K) + 1j*np.random.randn(K))*np.sqrt(1/2)
+    theta = np.pi*np.random.rand(K,1) - np.pi/2
     
     # realizations of received data, with L being number of realizations
     # Y = [y1 y2 .. yL]
@@ -24,8 +26,9 @@ def generate_single_data(N, K, L, f):
     # random inputs with |x_{k,l}| = 1
     for l in range(L):
         for k in range(K):
+            alpha = (np.random.randn(1) + 1j*np.random.randn(1))*np.sqrt(1/2)
             response = array_response(array, theta[k])
-            Y[:,l] += alpha[k]*response*np.exp(-1j*2*np.pi*f*1/L + np.random.rand(1))
+            Y[:,l] += alpha*response
         
     return np.repeat(theta, L, axis=1).T, Y
 
@@ -34,7 +37,7 @@ def apply_wgn(Y, SNR):
     db2pow = 10**(rand.uniform(SNR[0], SNR[1])/10)
     
     # N = [n1 n2 .. nL]
-    N = rand.randn(*shape)*np.sqrt(0.5/db2pow)
+    N = (rand.randn(*shape) + 1j*rand.randn(*shape))*np.sqrt(0.5/db2pow)
     
     return Y + N
 
@@ -77,7 +80,7 @@ def check_data_exists(filename):
     return isfile(filename + '_data.npy') and isfile(filename + '_labels.npy')
 
 def normalize(labels, data):
-    labels = labels/np.pi # normalize labels to [0,1]
+    labels = (labels - min_theta)/(max_theta - min_theta) # normalize labels to [0,1]
     data = data/np.max(data)
     
     return labels, data

@@ -17,17 +17,15 @@ def generate_single_data(N, K, L, f):
     theta = np.sort(np.pi*np.random.rand(K,1), axis=0)
     alpha = (np.random.randn(K) + 1j*np.random.randn(K))*np.sqrt(1/2)
     
-    # random inputs with |x_{k,l}| = 1
-    x = np.exp(-1j*2*np.pi*np.random.rand(K, L))
-    
     # realizations of received data, with L being number of realizations
     # Y = [y1 y2 .. yL]
     Y = np.zeros((N,L)) + 1j*np.zeros((N,L))
     
+    # random inputs with |x_{k,l}| = 1
     for l in range(L):
         for k in range(K):
             response = array_response(array, theta[k])
-            Y[:,l] += alpha[k]*response*x[k,l]
+            Y[:,l] += alpha[k]*response*np.exp(-1j*2*np.pi*f*1/L + np.random.rand(1))
         
     return np.repeat(theta, L, axis=1).T, Y
 

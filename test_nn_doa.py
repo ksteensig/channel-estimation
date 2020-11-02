@@ -26,12 +26,22 @@ def data_initialization(N, K, L, freq):
     testing_labels, testing_data = dg.load_generated_data(testing)
 
     return testing_labels, testing_data
-# antennas
 
+def normalize_add_wgn(labels, data, snr):
+    data = dg.apply_wgn(data, snr)
+
+    labels, data = dg.normalize(labels, data)
+
+    return labels, data
+
+
+denormalize = lambda x: (sqrt(x)*pi)**2
+
+# antennas
 N = 128
 
 # users
-K = 8
+K = [4,8,16,32]
 
 # frequency
 freq = 1e9
@@ -39,28 +49,28 @@ freq = 1e9
 # bits
 L = 16
 
-testing_labels, testing_data = data_initialization(N, K, L, freq)
+snr = [5, 30]
 
-model = load_model('models/users_8_snr_30_30_sgd_lr_0.1_momentum_0.5')
+learning_rate = 0.1
+momentum = 0.5
 
-mse_snr = []
-
-for i in [5,10,15,20,25,30]:
-    snr = [i,i]
-    print(snr)
-    wgn_testing_data = dg.apply_wgn(testing_data, snr)
-
-    norm_testing_labels, norm_testing_data = dg.normalize(testing_labels, wgn_testing_data)
-    test_loss, mse = model.evaluate(norm_testing_data, norm_testing_labels, verbose=2)
-    
-    mse_snr.append((sqrt(mse)*pi)**2)
-
-    print('\n MSE:', (sqrt(mse)*pi)**2)
-    
-    
 plt.xlabel('SNR (dB)')
 plt.ylabel('MSE')
 plt.ylim(0.01, 0.5)
-plt.semilogy([5,10,15,20,25,30], mse_snr)
-plt.grid()
-plt.show()
+
+for k in K:
+    model = load_model(f"models/users_{k}_sgd_lr_{learning_rate}_momentum_{momentum}")
+    testing_labels, testing_data = data_initialization(N, k, L, freq)
+    mse_snr = []
+    for i in [5,10,15,20,25,30]:
+        snr = [i,i]
+        
+        norm_testing_labels, norm_testing_data = normalize_add_wgn(testing_labels, testing_data, snr)
+        test_loss, mse = model.evaluate(norm_testing_data, norm_testing_labels, verbose=2)
+        
+        mse_snr.append(denormalize(mse))
+
+    plt.semilogy([5,10,15,20,25,30], mse_snr)
+    
+plt.legend(['K=4', 'K=8', 'K=16', 'K=32'])
+plt.savefig(f"figures/performance_sgd_lr_{learning_rate}_momentum_{momentum}.svg", format='svg')

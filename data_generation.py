@@ -17,7 +17,7 @@ def generate_single_data(N, K, L, f):
     # steering vector
     array_response = lambda array,theta: np.exp(-1j*2*np.pi*array*np.sin(theta))*np.sqrt(1/N)
 
-    theta = np.pi*np.random.rand(K,1) - np.pi/2
+    theta = np.sort(np.pi*np.random.rand(K,1) - np.pi/2, axis=0)
     
     # realizations of received data, with L being number of realizations
     # Y = [y1 y2 .. yL]
@@ -37,7 +37,7 @@ def apply_wgn(Y, SNR):
     db2pow = 10**(rand.uniform(SNR[0], SNR[1])/10)
     
     # N = [n1 n2 .. nL]
-    N = (rand.randn(*shape) + 1j*rand.randn(*shape))*np.sqrt(0.5/db2pow)
+    N = rand.randn(*shape)*np.sqrt(0.5/db2pow)
     
     return Y + N
 
@@ -57,9 +57,7 @@ def generate_bulk_data(data_points, N, K, L, freq):
     return labels, data
 
 
-def save_generated_data(filename, labels, data):
-    
-    
+def save_generated_data(filename, labels, data):    
     with open(filename + '_data.npy', 'wb') as f:
         np.save(f, data)
         

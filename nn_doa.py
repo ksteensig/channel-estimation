@@ -13,13 +13,13 @@ print('TensorFlow Version:', tf.__version__)
 
 #settings = [()]
 
-training_size = 150000
+training_size = 100000
 validation_size = 0.1 # 10% of training size
 
-def data_initialization(training_size, N, K, L, freq):
+def data_initialization(training_size, N, K, L, freq, theta_dist = 'uniform', sort=True):
     training = f"data/training_{N}_{K}_{L}"
     if not dg.check_data_exists(training):
-        labels, data = dg.generate_bulk_data(training_size, N, K, L, freq)
+        labels, data = dg.generate_bulk_data(training_size, N, K, L, freq, theta_dist, sort)
         dg.save_generated_data(training, labels, data)
         
     training_labels, training_data  = dg.load_generated_data(training)
@@ -27,11 +27,9 @@ def data_initialization(training_size, N, K, L, freq):
     return training_labels, training_data
 
 def normalize_add_wgn(labels, data, snr):
-    data = dg.apply_wgn(data, snr)
+    dg.apply_wgn(data, snr)
 
-    labels, data = dg.normalize(labels, data)
-
-    return labels, data
+    dg.normalize(labels, data)
 
 
 denormalize = lambda x: (sqrt(x)*pi)**2
@@ -40,7 +38,7 @@ denormalize = lambda x: (sqrt(x)*pi)**2
 N = 128
 
 # users
-K = [8, 32]
+K = [32]
 
 # frequency
 freq = 1e9
@@ -55,12 +53,12 @@ max_snr = 30
 snr = [min_snr, max_snr]
 
 learning_rate = 0.1
-momentum = 0.5
+momentum = 0.9
 
 def train_model(N, K, L, freq, snr):
-    training_labels, training_data = data_initialization(training_size, N, K, L, freq)
+    training_labels, training_data = data_initialization(training_size, N, K, L, freq, sort=True)
 
-    training_labels, training_data = normalize_add_wgn(training_labels, training_data, snr)
+    normalize_add_wgn(training_labels, training_data, snr)
 
     training_data, validation_data, training_labels, validation_labels = train_test_split(training_data, training_labels, test_size=validation_size, shuffle=False)
 
@@ -74,10 +72,12 @@ def train_model(N, K, L, freq, snr):
             keras.layers.Dense(200, activation='relu'),
             keras.layers.Dense(128, activation='relu'),
             keras.layers.Dense(K, activation='sigmoid')
+            #keras.layers.Dense(K, activation='sigmoid', activity_regularizer=tf.keras.regularizers.l2(0.01))
             ])
 
     sgd = keras.optimizers.SGD(learning_rate=learning_rate, momentum=momentum)
-
+    adam = keras.optimizers.Adam(learning_rate=learning_rate)
+    
     stopping = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=5, min_delta=1e-6)
 
     model.compile(optimizer=sgd,
@@ -86,14 +86,14 @@ def train_model(N, K, L, freq, snr):
 
     m = model.fit(training_data, training_labels, batch_size=1200, epochs=1500, validation_data=(validation_data, validation_labels), callbacks=[stopping])
 
-    model.save(f"models/users_{K}_sgd_lr_{learning_rate}_momentum_{momentum}")
+    model.save(f"models/users_{K}_bits_{L}_sgd_lr_{learning_rate}_momentum_{momentum}")
 
     plt.xlabel('Epoch')
     plt.ylabel('MSE')
     plt.plot(denormalize(m.history['mean_squared_error']), 'r')
     plt.plot(denormalize(m.history['val_mean_squared_error']), 'b')
     plt.legend(['Training', 'Validation'])
-    plt.savefig(f"figures/learning_curve_users_{K}_sgd_lr_{learning_rate}_momentum_{momentum}.svg", format='svg')
+    plt.savefig(f"figures/learning_curve_users_{K}_bits_{L}_sgd_lr_{learning_rate}_momentum_{momentum}.svg", format='svg')
     plt.clf()
     
 

@@ -4,8 +4,6 @@ from os.path import isfile
 max_theta = np.deg2rad(75)
 min_theta = -max_theta
 
-
-
 def save_generated_data(filename, labels, data):    
     with open(filename + '_data.npy', 'wb') as f:
         np.save(f, data)
@@ -26,24 +24,8 @@ def load_generated_data(filename):
 def check_data_exists(filename):
     return isfile(filename + '_data.npy') and isfile(filename + '_labels.npy')
 
-def normalize(labels, data):
-    labels[:] = (labels[:] - min_theta)/(max_theta - min_theta) # normalize labels to [0,1]
-    data[:] = data[:]/np.linalg.norm(data)
-    
-    return labels, data
-
-
-def apply_wgn(Y, SNR):
-    shape = Y.shape
-    db2pow = 10**(np.random.uniform(SNR[0], SNR[1])/10)
-    
-    # N = [n1 n2 .. nL]
-    N = np.random.randn(*shape)*np.sqrt(0.5/db2pow)
-    
-    return Y+N
-
 # SNR is a range between min and max SNR in dB
-def generate_single_data(N, K, L, f, theta_dist = 'uniform', sort = True, resolution=180):
+def generate_single_data(N, K, L, f, theta_dist = 'uniform', resolution=180):
     c = 3e8 # speed of light
     wl = c/f # wavelength (lambda)
     d = wl/2 # uniform distance between antennas
@@ -76,19 +58,19 @@ def generate_single_data(N, K, L, f, theta_dist = 'uniform', sort = True, resolu
             response = array_response(array, theta[k])
             Y[:,l] += alpha*response
             
-    theta = np.floor((theta - min_theta)/(max_theta - min_theta)).astype(int)
+    theta = np.floor(((theta - min_theta)/(max_theta - min_theta)*180)).astype(int)
     
     theta_grid = np.zeros((resolution, 1))
     theta_grid[theta] = 1
         
     return theta_grid, Y
 
-def generate_bulk_data(data_points, N, K, L, freq, dist='uniform', sort=True, resolution=180):
+def generate_bulk_data(data_points, N, K, L, freq, dist='uniform', resolution=180):
     data = np.zeros((data_points,N,L), dtype='complex64')
     labels = np.zeros((data_points,resolution,1))
 
     for i in range(data_points):
-        l,d = generate_single_data(N, K, L, freq, dist, sort, resolution)
+        l,d = generate_single_data(N, K, L, freq, dist, resolution)
         data[i,:N,:L] = d
         labels[i,:resolution] = l
         

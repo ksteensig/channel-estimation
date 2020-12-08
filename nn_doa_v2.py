@@ -5,7 +5,6 @@ import tensorflow as tf
 from tensorflow import keras
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
-from numpy import sqrt,pi
 import numpy as np
 from resnet import Residual
 
@@ -15,26 +14,34 @@ print('TensorFlow Version:', tf.__version__)
 
 #settings = [()]
 
-training_size = 100000
+training_size = 50000
 validation_size = 0.1 # 10% of training size
 
-def data_initialization(training_size, N, K, L, freq, theta_dist = 'uniform', sort=True):
+def data_initialization(training_size, N, K, L, freq, theta_dist = 'uniform'):
     training = f"data/training_v2_{N}_{K}_{L}"
     if not dg.check_data_exists(training):
-        labels, data = dg.generate_bulk_data(training_size, N, K, L, freq, theta_dist, sort)
-        dg.save_generated_data(training, labels, data)
+    
+        labels, data = dg.generate_bulk_data(training_size, N, K, L, freq, theta_dist)
+    
+        training_data = tf.convert_to_tensor(data)
+        training_labels = tf.convert_to_tensor(labels)
+
+        training_data = normalize_add_wgn(training_data, snr)
         
-    training_labels, training_data  = dg.load_generated_data(training)
+        C = tf.matmul(training_data, tf.transpose(training_data, perm=[0,2,1]))
+        
+        C = tf.reshape(C, [len(C),N*N])
+        
+        C = C/tf.reshape(tf.norm(C,axis=1), (-1, 1))
     
-    training_labels, training_data = dg.generate_bulk_data(training_size, N, K, L, freq, theta_dist, sort)
-
-    return training_labels, training_data
-
-def normalize_add_wgn(data, snr):
-    data = dg.apply_wgn(data, snr)
+        r,i = tf.math.real(C), tf.math.imag(C)
     
-    return data
-
+        training_data = tf.concat([r, i], axis=1)
+        
+        dg.save_generated_data(training, training_labels, training_data)
+        return training_labels, training_data
+        
+    return dg.load_generated_data(training)
 
 # antennas
 N = 8
@@ -54,34 +61,63 @@ max_snr = 30
 # snr between 5 and 30
 snr = [min_snr, max_snr]
 
+
 learning_rate = 0.1
-momentum = 0.9
+epoch_warmup = 200*1000
+epoch_decay = 400*1000
+adaptive_learning_rate = lambda epoch: learning_rate * min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
+#momentum = 0.9
+
+epochs = 12000000
+batch_size = 800
         
 output_size = 180
-block_depth = 7
+block_depth = 3
+
+loss_lookup = np.zeros((output_size, output_size))
+
+for i in range(output_size):
+    for j in range(output_size):
+        if i==j:
+            loss_lookup[i,j] = 0.8
+        else:
+            loss_lookup[i,j] =0.1*2**(-abs(i-j))
+
+comparator = tf.constant(tf.ones([output_size]))
+
+def loss_fun_body(ytrue):
+    condition = tf.equal(ytrue, comparator)
+    indices = tf.where(condition)
+                
+    return tf.reduce_sum(tf.gather_nd(loss_lookup, indices), axis=0)
+        
+
+def loss_fun(ytrue, ypred):
+    f = tf.map_fn(loss_fun_body, ytrue, fn_output_signature=tf.float64)
+    
+    
+    return 1/output_size * tf.norm(tf.cast(ypred, tf.float64) - f, axis=0)**2
+
+def apply_wgn(Y, SNR):
+    shape = Y.get_shape()
+    db2pow = 10**(np.random.uniform(SNR[0], SNR[1])/10)
+    
+    # N = [n1 n2 .. nL]
+    N1 = tf.random.normal(shape)*np.sqrt(0.5/db2pow)
+    N2 = tf.random.normal(shape)*np.sqrt(0.5/db2pow)
+    
+    return Y + tf.complex(N1, N2)
+
+def normalize_add_wgn(data, snr):
+    data = apply_wgn(data, snr)
+    
+    return data
 
 # train neural network based on the covariance of the Y data
 def train_model_v2(N, K, L, freq, snr):
-    training_labels, training_data = data_initialization(training_size, N, K, L, freq, sort=True)
-
-    training_data = normalize_add_wgn(training_data, snr)
-    
-    C = np.matmul(training_data, np.transpose(training_data, axes=[0,2,1]))
-        
-    C = (C/np.linalg.norm(C)).reshape(len(C),N*N)
-    
-    training_data = np.zeros((len(C), 2*N*N))
-    
-    training_data[:len(C), :N*N] = np.real(C)
-    training_data[:len(C), N*N:] = np.imag(C)
-    
-    training_data = training_data.reshape(len(training_data),2*N*N)
-
-    training_data, validation_data, training_labels, validation_labels = train_test_split(training_data, training_labels, test_size=validation_size, shuffle=False)
-    print(training_labels.shape)
+    training_labels, training_data = data_initialization(training_size, N, K, L, freq)
 
     # define model
-    
     input_ = tf.keras.layers.Input(shape=[2*N*N])
     
     h1 = tf.keras.layers.Dense(output_size)(input_)
@@ -108,20 +144,19 @@ def train_model_v2(N, K, L, freq, snr):
     
     model = keras.Model(inputs=[input_], outputs=[output] )
 
-    sgd = keras.optimizers.SGD(learning_rate=learning_rate, momentum=momentum)
-    
-    #stopping = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=5, min_delta=1e-6)
+    sgd = keras.optimizers.SGD(learning_rate=learning_rate)
 
-    model.compile(optimizer=sgd, loss='binary_crossentropy', metrics=[tf.keras.metrics.Accuracy()])
+    model.compile(optimizer=sgd, loss=loss_fun, metrics=[loss_fun], run_eagerly=True)
     
-    model.fit(training_data, training_labels, batch_size=800, epochs=100, validation_data=(validation_data, validation_labels))
+    lrate = tf.keras.callbacks.LearningRateScheduler(adaptive_learning_rate)
+    model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate])
     
     #tf.keras.utils.plot_model(
     #    model,
     #    to_file="model.png",
     #)
 
-    #model.save(f"models/dnn_v2_users_{K}_bits_{L}_sgd_lr_{learning_rate}_momentum_{momentum}")
+    model.save(f"models/dnn_v2_users_{K}_bits_{L}_sgd_lr_{learning_rate}")
 
     #plt.xlabel('Epoch')
     #plt.ylabel('MSE')

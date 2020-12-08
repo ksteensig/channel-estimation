@@ -8,11 +8,9 @@ class Residual(tf.keras.Model):  #@save
         self.conv2 = tf.keras.layers.Conv1D(
             num_channels, kernel_size=3, padding='same')
         self.conv3 = None
-        if use_1x1conv:
-            self.conv3 = tf.keras.layers.Conv1D(
-                num_channels, kernel_size=1, strides=strides)
-        self.bn1 = tf.keras.layers.BatchNormalization()
-        self.bn2 = tf.keras.layers.BatchNormalization()
+
+        self.bn1 = tf.keras.layers.LayerNormalization()
+        self.bn2 = tf.keras.layers.LayerNormalization()
 
     def call(self, X):
         Y = tf.keras.activations.relu(self.bn1(self.conv1(X)))

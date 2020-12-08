@@ -95,7 +95,6 @@ def loss_fun_body(ytrue):
 def loss_fun(ytrue, ypred):
     f = tf.map_fn(loss_fun_body, ytrue, fn_output_signature=tf.float64)
     
-    
     return 1/output_size * tf.norm(tf.cast(ypred, tf.float64) - f, axis=0)**2
 
 def apply_wgn(Y, SNR):
@@ -146,10 +145,11 @@ def train_model_v2(N, K, L, freq, snr):
 
     sgd = keras.optimizers.SGD(learning_rate=learning_rate)
 
-    model.compile(optimizer=sgd, loss=loss_fun, metrics=[loss_fun], run_eagerly=True)
+    model.compile(optimizer=sgd, loss=loss_fun)
     
     lrate = tf.keras.callbacks.LearningRateScheduler(adaptive_learning_rate)
-    model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate])
+    stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, min_delta=1e-6)
+    m = model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate, stopping])
     
     #tf.keras.utils.plot_model(
     #    model,
@@ -158,13 +158,11 @@ def train_model_v2(N, K, L, freq, snr):
 
     model.save(f"models/dnn_v2_users_{K}_bits_{L}_sgd_lr_{learning_rate}")
 
-    #plt.xlabel('Epoch')
-    #plt.ylabel('MSE')
-    #plt.plot(m.history['loss'], 'r')
-    #plt.plot(m.history['val_mean_squared_error'], 'b')
-    #plt.legend(['Training', 'Validation'])
-    #plt.savefig(f"figures/learning_curve_users_{K}_bits_{L}_sgd_lr_{learning_rate}_momentum_{momentum}.svg", format='svg')
-    #plt.clf()
+    plt.plot(m.history['loss'], 'r')
+    plt.plot(m.history['val_loss'], 'b')
+    plt.legend(['Training', 'Validation'])
+    plt.savefig(f"figures/learning_curve_users_{K}_bits_{L}_sgd_lr_{learning_rate}.svg", format='svg')
+    plt.clf()
     
 for k in K:
     train_model_v2(N, k, L, freq, snr)

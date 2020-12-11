@@ -122,7 +122,7 @@ def train_model_v2(N, K, L, freq, snr):
     output = tf.keras.layers.Dense(output_size, activation='sigmoid')(h1)
     
     model = keras.Model(inputs=[input_], outputs=[output] )
-
+    
     sgd = keras.optimizers.SGD(learning_rate=learning_rate)
 
     model.compile(optimizer=sgd, loss=loss_fun)
@@ -137,6 +137,11 @@ def train_model_v2(N, K, L, freq, snr):
     #)
 
     model.save(f"models/dnn_v2_users_{K}_bits_{L}_sgd_lr_{learning_rate}")
+
+    hist_df = pd.DataFrame(m.history)
+    with open('history.csv', mode='w') as f:
+        hist_df.to_csv(f)
+
 
     plt.plot(m.history['loss'], 'r')
     plt.plot(m.history['val_loss'], 'b')

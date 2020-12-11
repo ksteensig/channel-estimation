@@ -22,7 +22,7 @@ def data_initialization(training_size, N, K, L, freq, theta_dist = 'uniform'):
     if not dg.check_data_exists(training):
     
         labels, data = dg.generate_bulk_data(training_size, N, K, L, freq, theta_dist)
-    
+        
         training_data = tf.convert_to_tensor(data)
         training_labels = tf.convert_to_tensor(labels)
 
@@ -36,12 +36,14 @@ def data_initialization(training_size, N, K, L, freq, theta_dist = 'uniform'):
     
         r,i = tf.math.real(C), tf.math.imag(C)
     
-        training_data = tf.concat([r, i], axis=1)
+        training_data = tf.cast(tf.concat([r, i], axis=1), dtype=tf.float32)
         
         dg.save_generated_data(training, training_labels, training_data)
         return training_labels, training_data
         
-    return dg.load_generated_data(training)
+    labels, data = dg.load_generated_data(training)
+    
+    return labels, tf.cast(data, dtype=tf.float32)
 
 # antennas
 N = 8
@@ -63,18 +65,18 @@ snr = [min_snr, max_snr]
 
 
 learning_rate = 0.1
-epoch_warmup = 200*1000
-epoch_decay = 400*1000
-adaptive_learning_rate = lambda epoch: learning_rate * min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
+epoch_warmup = 10
+epoch_decay = 20
+adaptive_learning_rate = lambda epoch: learning_rate #* min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
 #momentum = 0.9
 
-epochs = 12000000
-batch_size = 800
+epochs = 100
+batch_size = 800    
         
 output_size = 180
-block_depth = 3
+block_depth = 15
 
-loss_lookup = np.zeros((output_size, output_size))
+loss_lookup = np.zeros((output_size, output_size), dtype=np.float32)
 
 for i in range(output_size):
     for j in range(output_size):
@@ -88,14 +90,16 @@ comparator = tf.constant(tf.ones([output_size]))
 def loss_fun_body(ytrue):
     condition = tf.equal(ytrue, comparator)
     indices = tf.where(condition)
-                
+    
     return tf.reduce_sum(tf.gather_nd(loss_lookup, indices), axis=0)
-        
+
 
 def loss_fun(ytrue, ypred):
-    f = tf.map_fn(loss_fun_body, ytrue, fn_output_signature=tf.float64)
+    f = tf.map_fn(loss_fun_body, ytrue)
     
-    return 1/output_size * tf.norm(tf.cast(ypred, tf.float64) - f, axis=0)**2
+    print(f)
+    
+    return ypred - f #* 1/tf.size(f)
 
 def apply_wgn(Y, SNR):
     shape = Y.get_shape()
@@ -124,7 +128,7 @@ def train_model_v2(N, K, L, freq, snr):
     h1 = Residual(block_depth, output_size)(h1)
     h1 = tf.keras.layers.MaxPooling1D()(h1)
     h1 = tf.keras.layers.Flatten()(h1)
-    
+    """
     h1 = tf.keras.layers.Dense(2*output_size)(h1)
     h1 = tf.keras.layers.Reshape((2*output_size,1))(h1)
     h1 = Residual(block_depth, 2*output_size)(h1)
@@ -138,7 +142,7 @@ def train_model_v2(N, K, L, freq, snr):
     h1 = tf.keras.layers.Dropout(0.5)(h1)
     h1 = tf.keras.layers.MaxPooling1D()(h1)
     h1 = tf.keras.layers.Flatten()(h1)
-
+    """
     output = tf.keras.layers.Dense(output_size, activation='sigmoid')(h1)
     
     model = keras.Model(inputs=[input_], outputs=[output] )
@@ -148,7 +152,7 @@ def train_model_v2(N, K, L, freq, snr):
     model.compile(optimizer=sgd, loss=loss_fun)
     
     lrate = tf.keras.callbacks.LearningRateScheduler(adaptive_learning_rate)
-    stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, min_delta=1e-6)
+    stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, min_delta=1e-6)
     m = model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate, stopping])
     
     #tf.keras.utils.plot_model(

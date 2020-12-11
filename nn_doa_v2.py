@@ -65,41 +65,17 @@ snr = [min_snr, max_snr]
 
 
 learning_rate = 0.1
-epoch_warmup = 10
-epoch_decay = 20
-adaptive_learning_rate = lambda epoch: learning_rate #* min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
+epoch_warmup = 20
+epoch_decay = 40
+adaptive_learning_rate = lambda epoch: learning_rate * min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
 #momentum = 0.9
 
-epochs = 100
-batch_size = 800    
-        
-output_size = 180
-block_depth = 15
+epochs = 200
+batch_size = 800
 
-loss_lookup = np.zeros((output_size, output_size), dtype=np.float32)
+block_depth = 3
 
-for i in range(output_size):
-    for j in range(output_size):
-        if i==j:
-            loss_lookup[i,j] = 0.8
-        else:
-            loss_lookup[i,j] =0.1*2**(-abs(i-j))
-
-comparator = tf.constant(tf.ones([output_size]))
-
-def loss_fun_body(ytrue):
-    condition = tf.equal(ytrue, comparator)
-    indices = tf.where(condition)
-    
-    return tf.reduce_sum(tf.gather_nd(loss_lookup, indices), axis=0)
-
-
-def loss_fun(ytrue, ypred):
-    f = tf.map_fn(loss_fun_body, ytrue)
-    
-    print(f)
-    
-    return ypred - f #* 1/tf.size(f)
+from loss import *
 
 def apply_wgn(Y, SNR):
     shape = Y.get_shape()
@@ -128,7 +104,7 @@ def train_model_v2(N, K, L, freq, snr):
     h1 = Residual(block_depth, output_size)(h1)
     h1 = tf.keras.layers.MaxPooling1D()(h1)
     h1 = tf.keras.layers.Flatten()(h1)
-    """
+    
     h1 = tf.keras.layers.Dense(2*output_size)(h1)
     h1 = tf.keras.layers.Reshape((2*output_size,1))(h1)
     h1 = Residual(block_depth, 2*output_size)(h1)
@@ -142,7 +118,7 @@ def train_model_v2(N, K, L, freq, snr):
     h1 = tf.keras.layers.Dropout(0.5)(h1)
     h1 = tf.keras.layers.MaxPooling1D()(h1)
     h1 = tf.keras.layers.Flatten()(h1)
-    """
+    
     output = tf.keras.layers.Dense(output_size, activation='sigmoid')(h1)
     
     model = keras.Model(inputs=[input_], outputs=[output] )
@@ -153,7 +129,7 @@ def train_model_v2(N, K, L, freq, snr):
     
     lrate = tf.keras.callbacks.LearningRateScheduler(adaptive_learning_rate)
     stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, min_delta=1e-6)
-    m = model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate, stopping])
+    m = model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate])
     
     #tf.keras.utils.plot_model(
     #    model,

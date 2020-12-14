@@ -81,8 +81,8 @@ print(model.evaluate(data, labels))
 
 labels = tf.cast(labels, tf.float32)
 l = tf.map_fn(loss_fun_body, labels)
-plt.plot(np.mean(labels, axis=0))
-plt.plot(np.mean(l, axis=0))
+plt.plot(np.mean(labels, axis=0)/1e9)
+#plt.plot(np.mean(l, axis=0))
 
 predictions = tf.convert_to_tensor(model.predict(data))
 plt.plot(np.mean(predictions, axis=0))

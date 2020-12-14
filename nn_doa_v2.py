@@ -73,7 +73,7 @@ epoch_decay = 400
 adaptive_learning_rate = lambda epoch: learning_rate #* min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
 #momentum = 0.9
 
-epochs = 1
+epochs = 20
 batch_size = 800
 
 block_depth = 3
@@ -103,26 +103,26 @@ def train_model_v2(N, K, L, freq, snr):
     input_ = tf.keras.layers.Input(shape=[2*N*N])
     
     h1 = tf.keras.layers.Dense(output_size)(input_)
-    h1 = tf.keras.layers.Reshape((output_size,1))(h1)
+    #h1 = tf.keras.layers.Reshape((output_size,1))(h1)
     h1 = ResnetBlock(output_size, block_depth)(h1)
-    h1 = tf.keras.layers.AveragePooling1D(strides=90)(h1)
-    h1 = tf.keras.layers.Flatten()(h1)
+    #h1 = tf.keras.layers.AveragePooling1D(strides=180)(h1)
+    #h1 = tf.keras.layers.Flatten()(h1)
+
     
-    """
     h1 = tf.keras.layers.Dense(2*output_size)(h1)
-    h1 = tf.keras.layers.Reshape((2*output_size,1))(h1)
+    #h1 = tf.keras.layers.Reshape((2*output_size,1))(h1)
     h1 = ResnetBlock(2*output_size, block_depth)(h1)
     h1 = tf.keras.layers.Dropout(0.5)(h1)
-    h1 = tf.keras.layers.AveragePooling1D(strides=45)(h1)
-    h1 = tf.keras.layers.Flatten()(h1)
+    #h1 = tf.keras.layers.AveragePooling1D(strides=180)(h1)
+    #h1 = tf.keras.layers.Flatten()(h1)
     
     h1 = tf.keras.layers.Dense(4*output_size)(h1)
-    h1 = tf.keras.layers.Reshape((4*output_size,1))(h1)
+    #h1 = tf.keras.layers.Reshape((4*output_size,1))(h1)
     h1 = ResnetBlock(4*output_size, block_depth)(h1)
     h1 = tf.keras.layers.Dropout(0.5)(h1)
-    h1 = tf.keras.layers.AveragePooling1D(strides=180)(h1)
-    h1 = tf.keras.layers.Flatten()(h1)
-    """
+    #h1 = tf.keras.layers.AveragePooling1D(strides=180)(h1)
+    #h1 = tf.keras.layers.Flatten()(h1)
+    
     output = tf.keras.layers.Dense(output_size, activation='sigmoid')(h1)
     
     model = keras.Model(inputs=[input_], outputs=[output] )

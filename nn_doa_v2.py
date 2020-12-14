@@ -6,7 +6,7 @@ from tensorflow import keras
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import numpy as np
-from resnet import ResnetBlock
+from resnet import Residual, ResnetBlock
 import pandas as pd
 
 import data_generation_v2 as dg
@@ -76,7 +76,7 @@ adaptive_learning_rate = lambda epoch: learning_rate #* min(min((epoch+1)/epoch_
 epochs = 1
 batch_size = 800
 
-block_depth = 1
+block_depth = 3
 
 from loss import *
 
@@ -105,22 +105,23 @@ def train_model_v2(N, K, L, freq, snr):
     h1 = tf.keras.layers.Dense(output_size)(input_)
     h1 = tf.keras.layers.Reshape((output_size,1))(h1)
     h1 = ResnetBlock(output_size, block_depth)(h1)
-    h1 = tf.keras.layers.MaxPooling1D()(h1)
+    h1 = tf.keras.layers.AveragePooling1D(strides=90)(h1)
     h1 = tf.keras.layers.Flatten()(h1)
+    
     """
     h1 = tf.keras.layers.Dense(2*output_size)(h1)
     h1 = tf.keras.layers.Reshape((2*output_size,1))(h1)
     h1 = ResnetBlock(2*output_size, block_depth)(h1)
     h1 = tf.keras.layers.Dropout(0.5)(h1)
-    h1 = tf.keras.layers.MaxPooling1D()(h1)
-    #h1 = tf.keras.layers.Flatten()(h1)
+    h1 = tf.keras.layers.AveragePooling1D(strides=45)(h1)
+    h1 = tf.keras.layers.Flatten()(h1)
     
     h1 = tf.keras.layers.Dense(4*output_size)(h1)
     h1 = tf.keras.layers.Reshape((4*output_size,1))(h1)
     h1 = ResnetBlock(4*output_size, block_depth)(h1)
     h1 = tf.keras.layers.Dropout(0.5)(h1)
-    h1 = tf.keras.layers.MaxPooling1D()(h1)
-    #h1 = tf.keras.layers.Flatten()(h1)
+    h1 = tf.keras.layers.AveragePooling1D(strides=180)(h1)
+    h1 = tf.keras.layers.Flatten()(h1)
     """
     output = tf.keras.layers.Dense(output_size, activation='sigmoid')(h1)
     
@@ -133,9 +134,9 @@ def train_model_v2(N, K, L, freq, snr):
     
     lrate = tf.keras.callbacks.LearningRateScheduler(adaptive_learning_rate)
     stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, min_delta=1e-6)
-    #tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs, profile_batch = '500,510')
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs, profile_batch = '500,510')
     
-    m = model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate, stopping])
+    m = model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate, tensorboard_callback, stopping])
     
     #tf.keras.utils.plot_model(
     #    model,

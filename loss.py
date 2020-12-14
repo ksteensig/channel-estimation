@@ -14,14 +14,16 @@ for i in range(output_size):
 
 comparator = tf.constant(tf.ones([output_size]))
 
+@tf.function
 def loss_fun_body(ytrue):
     condition = tf.equal(ytrue, comparator)
     indices = tf.where(condition)
     
     return tf.reduce_sum(tf.gather_nd(loss_lookup, indices), axis=0)
 
-
+@tf.function
 def loss_fun(ytrue, ypred):
     f = tf.map_fn(loss_fun_body, ytrue)
     
-    return tf.reduce_mean(tf.norm(ypred - f, axis=1)**2) #* 1/tf.size(f)
+    #return tf.keras.losses.MSE(tf.transpose(f), tf.transpose(ypred))
+    return tf.reduce_mean(tf.norm(ypred - f, axis=1)**2)

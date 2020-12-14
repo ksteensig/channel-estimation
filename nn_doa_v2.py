@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import numpy as np
 from resnet import Residual
+import pandas as pd
 
 import data_generation_v2 as dg
 
@@ -65,15 +66,15 @@ snr = [min_snr, max_snr]
 
 
 learning_rate = 0.1
-epoch_warmup = 20
-epoch_decay = 40
+epoch_warmup = 100
+epoch_decay = 400
 adaptive_learning_rate = lambda epoch: learning_rate * min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
 #momentum = 0.9
 
 epochs = 200
 batch_size = 800
 
-block_depth = 3
+block_depth = 1
 
 from loss import *
 
@@ -128,8 +129,8 @@ def train_model_v2(N, K, L, freq, snr):
     model.compile(optimizer=sgd, loss=loss_fun)
     
     lrate = tf.keras.callbacks.LearningRateScheduler(adaptive_learning_rate)
-    stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, min_delta=1e-6)
-    m = model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate])
+    stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, min_delta=1e-6)
+    m = model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate, stopping])
     
     #tf.keras.utils.plot_model(
     #    model,

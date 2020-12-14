@@ -10,6 +10,8 @@ from tensorflow.keras.models import load_model
 import numpy as np
 import pandas as pd
 
+from loss import *
+
 import data_generation_v2 as dg
 
 print('TensorFlow Version:', tf.__version__)
@@ -32,7 +34,7 @@ def normalize_add_wgn(data, snr):
     return data
 
 
-testing_size = 20
+testing_size = 1
 
 def data_initialization(training_size, N, K, L, freq, theta_dist = 'uniform'):
     
@@ -77,13 +79,15 @@ model = load_model(f"models/dnn_v2_users_{K}_bits_{L}_sgd_lr_{learning_rate}", c
 
 print(model.evaluate(data, labels))
 
+labels = tf.cast(labels, tf.float32)
+l = tf.map_fn(loss_fun_body, labels)
+plt.plot(np.mean(labels, axis=0))
+plt.plot(np.mean(l, axis=0))
+
 predictions = tf.convert_to_tensor(model.predict(data))
 plt.plot(np.mean(predictions, axis=0))
 
-l = tf.cast(labels, tf.float32)
-
-l = tf.map_fn(loss_fun_body, l)
-plt.plot(np.mean(l, axis=0))
+plt.show()
 
 #h = pd.read_csv('history.csv')
 

@@ -6,12 +6,14 @@ from tensorflow import keras
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import numpy as np
-from resnet import Residual
+from resnet import ResnetBlock
 import pandas as pd
 
 import data_generation_v2 as dg
 
 print('TensorFlow Version:', tf.__version__)
+
+logs = './logs'
 
 #settings = [()]
 
@@ -59,7 +61,7 @@ freq = 1e9
 L = 500
 
 min_snr = 5
-max_snr = 30
+max_snr = 30    
 
 # snr between 5 and 30
 snr = [min_snr, max_snr]
@@ -68,10 +70,10 @@ snr = [min_snr, max_snr]
 learning_rate = 0.1
 epoch_warmup = 100
 epoch_decay = 400
-adaptive_learning_rate = lambda epoch: learning_rate * min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
+adaptive_learning_rate = lambda epoch: learning_rate #* min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
 #momentum = 0.9
 
-epochs = 200
+epochs = 1
 batch_size = 800
 
 block_depth = 1
@@ -102,34 +104,37 @@ def train_model_v2(N, K, L, freq, snr):
     
     h1 = tf.keras.layers.Dense(output_size)(input_)
     h1 = tf.keras.layers.Reshape((output_size,1))(h1)
-    h1 = Residual(block_depth, output_size)(h1)
+    h1 = ResnetBlock(output_size, block_depth)(h1)
     h1 = tf.keras.layers.MaxPooling1D()(h1)
     h1 = tf.keras.layers.Flatten()(h1)
-    
+    """
     h1 = tf.keras.layers.Dense(2*output_size)(h1)
     h1 = tf.keras.layers.Reshape((2*output_size,1))(h1)
-    h1 = Residual(block_depth, 2*output_size)(h1)
+    h1 = ResnetBlock(2*output_size, block_depth)(h1)
     h1 = tf.keras.layers.Dropout(0.5)(h1)
     h1 = tf.keras.layers.MaxPooling1D()(h1)
-    h1 = tf.keras.layers.Flatten()(h1)
+    #h1 = tf.keras.layers.Flatten()(h1)
     
     h1 = tf.keras.layers.Dense(4*output_size)(h1)
     h1 = tf.keras.layers.Reshape((4*output_size,1))(h1)
-    h1 = Residual(block_depth, 4*output_size)(h1)
+    h1 = ResnetBlock(4*output_size, block_depth)(h1)
     h1 = tf.keras.layers.Dropout(0.5)(h1)
     h1 = tf.keras.layers.MaxPooling1D()(h1)
-    h1 = tf.keras.layers.Flatten()(h1)
-    
+    #h1 = tf.keras.layers.Flatten()(h1)
+    """
     output = tf.keras.layers.Dense(output_size, activation='sigmoid')(h1)
     
     model = keras.Model(inputs=[input_], outputs=[output] )
     
     sgd = keras.optimizers.SGD(learning_rate=learning_rate)
+    adam = keras.optimizers.Adam(learning_rate=learning_rate)
 
     model.compile(optimizer=sgd, loss=loss_fun)
     
     lrate = tf.keras.callbacks.LearningRateScheduler(adaptive_learning_rate)
     stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, min_delta=1e-6)
+    #tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs, profile_batch = '500,510')
+    
     m = model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate, stopping])
     
     #tf.keras.utils.plot_model(

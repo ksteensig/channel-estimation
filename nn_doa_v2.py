@@ -13,8 +13,6 @@ import data_generation_v2 as dg
 
 print('TensorFlow Version:', tf.__version__)
 
-
-
 logs = './logs'
 
 #settings = [()]
@@ -41,15 +39,14 @@ def data_initialization(training_size, N, K, L, freq, theta_dist = 'uniform'):
     
         r,i = tf.math.real(C), tf.math.imag(C)
     
-        training_data = tf.cast(tf.concat([r, i], axis=1), dtype=tf.float16)
-        training_labels = tf.cast(training_labels, tf.float16)
+        training_data = tf.cast(tf.concat([r, i], axis=1), dtype=tf.float32)
         
         dg.save_generated_data(training, training_labels, training_data)
         return training_labels, training_data
         
     labels, data = dg.load_generated_data(training)
     
-    return tf.cast(labels, dtype=tf.float16), tf.cast(data, dtype=tf.float16)
+    return labels, tf.cast(data, dtype=tf.float32)
 
 # antennas
 N = 8
@@ -76,7 +73,7 @@ epoch_decay = 400e3
 adaptive_learning_rate = lambda epoch: learning_rate * min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
 #momentum = 0.9
 
-epochs = 10
+epochs = 1000
 batch_size = 800
 
 block_depth = 1
@@ -121,7 +118,6 @@ def train_model_v2(N, K, L, freq, snr):
     model = keras.Model(inputs=[input_], outputs=[output] )
     
     sgd = keras.optimizers.SGD(learning_rate=learning_rate)
-    sgd = tf.keras.mixed_precision.LossScaleOptimizer(sgd)
     adam = keras.optimizers.Adam(learning_rate=learning_rate)
 
     model.compile(optimizer=sgd, loss=loss_fun)

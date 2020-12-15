@@ -1,4 +1,7 @@
 import tensorflow as tf
+from tensorflow.keras.activations import relu
+from tensorflow.keras.layers import Dropout
+
 """
 class Residual(tf.keras.Model):  #@save
     def __init__(self, num_channels, use_1x1conv=False, strides=1):
@@ -46,21 +49,17 @@ class ResnetBlock(tf.keras.layers.Layer):
 class Residual(tf.keras.Model):  #@save
     def __init__(self, num_channels):
         super().__init__()
-        self.conv1 = tf.keras.layers.Dense(num_channels)
-        self.conv2 = tf.keras.layers.Dense(num_channels)
-        self.conv3 = None
+        self.W1 = tf.keras.layers.Dense(num_channels)
+        self.W2 = tf.keras.layers.Dense(num_channels)
         
-        self.bn1 = tf.keras.layers.LayerNormalization()
-        self.bn2 = tf.keras.layers.LayerNormalization()
+        self.lnorm = tf.keras.layers.LayerNormalization()
 
     def call(self, X):
-        Y = tf.keras.activations.relu(self.bn1(self.conv1(X)))
-        Y = self.bn2(self.conv2(Y))
-        if self.conv3 is not None:
-            X = self.conv3(X)
-        Y = tf.keras.layers.Dropout(0.1)(Y)
-        Y += X
-        return tf.keras.activations.relu(Y)
+        ResX = relu(self.W1(X))
+        ResX = self.W2(ResX)
+        ResX = Dropout(0.1)(ResX) 
+        
+        return self.lnorm(X + ResX)
 
 class ResnetBlock(tf.keras.layers.Layer):
     def __init__(self, num_channels, num_residuals, **kwargs):

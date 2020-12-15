@@ -68,15 +68,15 @@ snr = [min_snr, max_snr]
 
 
 learning_rate = 0.1
-epoch_warmup = 100
-epoch_decay = 400
+epoch_warmup = 200e3
+epoch_decay = 400e3
 adaptive_learning_rate = lambda epoch: learning_rate #* min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
 #momentum = 0.9
 
-epochs = 20
+epochs = 10
 batch_size = 800
 
-block_depth = 3
+block_depth = 1
 
 from loss import *
 
@@ -103,25 +103,15 @@ def train_model_v2(N, K, L, freq, snr):
     input_ = tf.keras.layers.Input(shape=[2*N*N])
     
     h1 = tf.keras.layers.Dense(output_size)(input_)
-    #h1 = tf.keras.layers.Reshape((output_size,1))(h1)
     h1 = ResnetBlock(output_size, block_depth)(h1)
-    #h1 = tf.keras.layers.AveragePooling1D(strides=180)(h1)
-    #h1 = tf.keras.layers.Flatten()(h1)
 
-    
     h1 = tf.keras.layers.Dense(2*output_size)(h1)
-    #h1 = tf.keras.layers.Reshape((2*output_size,1))(h1)
     h1 = ResnetBlock(2*output_size, block_depth)(h1)
     h1 = tf.keras.layers.Dropout(0.5)(h1)
-    #h1 = tf.keras.layers.AveragePooling1D(strides=180)(h1)
-    #h1 = tf.keras.layers.Flatten()(h1)
     
     h1 = tf.keras.layers.Dense(4*output_size)(h1)
-    #h1 = tf.keras.layers.Reshape((4*output_size,1))(h1)
     h1 = ResnetBlock(4*output_size, block_depth)(h1)
     h1 = tf.keras.layers.Dropout(0.5)(h1)
-    #h1 = tf.keras.layers.AveragePooling1D(strides=180)(h1)
-    #h1 = tf.keras.layers.Flatten()(h1)
     
     output = tf.keras.layers.Dense(output_size, activation='sigmoid')(h1)
     
@@ -136,7 +126,7 @@ def train_model_v2(N, K, L, freq, snr):
     stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, min_delta=1e-6)
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logs, profile_batch = '500,510')
     
-    m = model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate, tensorboard_callback, stopping])
+    m = model.fit(training_data, training_labels, batch_size=batch_size, epochs=epochs, validation_split=validation_size, callbacks=[lrate, tensorboard_callback])
     
     #tf.keras.utils.plot_model(
     #    model,

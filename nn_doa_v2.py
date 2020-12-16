@@ -9,6 +9,8 @@ import numpy as np
 from resnet import Residual, ResnetBlock
 import pandas as pd
 
+from tensorflow.keras import initializers
+
 import data_generation_v2 as dg
 
 print('TensorFlow Version:', tf.__version__)
@@ -70,11 +72,15 @@ snr = [min_snr, max_snr]
 learning_rate = 0.1
 epoch_warmup = 200e3
 epoch_decay = 400e3
-adaptive_learning_rate = lambda epoch: learning_rate * min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
+
+def adaptive_learning_rate(epoch):
+   
+    return learning_rate * min(min((epoch+1)/epoch_warmup, (epoch_decay/(epoch+1))**2), 1)
+
 #momentum = 0.9
 
 epochs = 1000
-batch_size = 800
+batch_size = 1000
 
 block_depth = 1
 
@@ -105,11 +111,17 @@ def train_model_v2(N, K, L, freq, snr):
     h1 = tf.keras.layers.Dense(output_size)(input_)
     h1 = ResnetBlock(output_size, block_depth)(h1)
 
-    h1 = tf.keras.layers.Dense(2*output_size)(h1)
+    h1 = tf.keras.layers.Dense(2*output_size,
+                               kernel_initializer=initializers.RandomNormal(stddev=1/(2*output_size)**2),
+                               bias_initializer=initializers.Zeros())(h1)
+    
     h1 = ResnetBlock(2*output_size, block_depth)(h1)
     h1 = tf.keras.layers.Dropout(0.5)(h1)
     
-    h1 = tf.keras.layers.Dense(4*output_size)(h1)
+    h1 = tf.keras.layers.Dense(units=4*output_size,
+                               kernel_initializer=initializers.RandomNormal(stddev=1/(4*output_size)**2),
+                               bias_initializer=initializers.Zeros())(h1)
+    
     h1 = ResnetBlock(4*output_size, block_depth)(h1)
     h1 = tf.keras.layers.Dropout(0.5)(h1)
     
@@ -120,7 +132,7 @@ def train_model_v2(N, K, L, freq, snr):
     sgd = keras.optimizers.SGD(learning_rate=learning_rate)
     adam = keras.optimizers.Adam(learning_rate=learning_rate)
 
-    model.compile(optimizer=sgd, loss=loss_fun)
+    model.compile(optimizer=adam, loss=loss_fun)
     
     lrate = tf.keras.callbacks.LearningRateScheduler(adaptive_learning_rate)
     stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, min_delta=1e-6)

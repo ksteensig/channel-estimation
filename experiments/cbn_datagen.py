@@ -95,8 +95,6 @@ def data_initialization(training_size, N, K, L, freq, res, snr, theta_dist = 'un
     
     if not cache:
         labels, data = generate_bulk_data(training_size, N, K, L, freq, res, theta_dist)
-        normalize_add_wgn(labels, data, snr)
-
         return labels, data
     
     if not check_data_exists(training):
@@ -105,8 +103,6 @@ def data_initialization(training_size, N, K, L, freq, res, snr, theta_dist = 'un
         return labels, data
         
     training_labels, training_data  = load_generated_data(training)
-    
-    normalize_add_wgn(training_labels, training_data, snr)
 
     return training_labels, training_data
 

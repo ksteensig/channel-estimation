@@ -29,42 +29,44 @@ def generate_single_data(N, K, f, theta_bound = np.pi/2, theta_dist = 'uniform',
     alpha = (np.random.randn(K,1) + 1j*np.random.randn(K,1))*np.sqrt(1/2)
     response = array_response(array, theta)
         
-    yl = np.inner(response.T, alpha.T).T
-    
-    yl_split = np.concatenate((yl.real,yl.imag), axis=1)
+    yl = np.inner(response.T, alpha.T)
     
     if sort:
         theta = np.sort(theta, axis=0)
         
-    return theta.T, yl_split
+    return theta.T, yl.T
 
-def apply_wgn(Y, L, SNR):
+def apply_wgn(Y, SNR):
     shape = Y.shape
 
-    # Y consists of L-repeats of different y's
-    # all identical y's must use the same SNR
-    db2pow = 10**(rand.uniform(SNR[0], SNR[1], size=(int(shape[0]/L),1))/10)
-    db2pow = np.repeat(db2pow, L, axis=1)
-    db2pow = db2pow.flatten().reshape((shape[0], 1))
+    db2pow = 10**(rand.uniform(SNR[0], SNR[1], size=(shape[0],1))/10)
+    
+    n = int(np.sqrt(shape[1]/2))
+    
+    N = np.eye(n,n).reshape(n**2)*(0.5/db2pow)
         
-    return Y + rand.randn(*shape)*np.sqrt(0.5/db2pow)
+    Y[:,:n**2] += N
+    
+    return Y
 
-def generate_bulk_data(data_points, N, K, L, freq, dist = 'uniform', sort = False):
-    data = np.zeros((data_points*L,2*N))
-    labels = np.zeros((data_points*L,K))
+def generate_bulk_data(data_points, N, K, L, freq = 2.4e9, dist = 'uniform', sort = False):
+    data = np.zeros((data_points, L, N), dtype=np.complex64)
+    labels = np.zeros((data_points, K))
     
     for i in range(data_points):
-        theta,yl = generate_single_data(N, K, freq, theta_bound=np.pi/2, theta_dist = dist,sort = sort)
-        Theta, Y = np.repeat(theta, L, axis=0), np.repeat(yl, L, axis=0)
+        theta,yl = generate_single_data(N, K, freq, theta_bound=np.pi/2, theta_dist = dist, sort = sort)
         
-        start = L*i
-        end = start + L
-        
-        data[start:end, :] = Y
-        labels[start:end, :] = Theta
+        data[i, :, :] = np.repeat(yl, L, axis=0)
+        labels[i, :] = theta
             
-    return labels, data
+    return labels, compute_cov(data)
 
+def compute_cov(data):
+    shape = data.shape
+    data = np.matmul(data.transpose((0,2,1)), data).reshape((shape[0], shape[2]**2))
+    data = np.concatenate((data.real,data.imag), axis=1)
+    
+    return data
 
 def save_generated_data(filename, labels, data):    
     with open(filename + '_data.npy', 'wb') as f:
@@ -85,6 +87,26 @@ def load_generated_data(filename):
 
 def check_data_exists(filename):
     return isfile(filename + '_data.npy') and isfile(filename + '_labels.npy')
+    
+def data_initialization(training_size, N, K, L, freq, snr, theta_dist = 'uniform', cache = True):
+    training = f"data/RBN_cov_training_N={N}_K={K}_L={L}"
+    
+    if not cache:
+        labels, data = generate_bulk_data(training_size, N, K, L, freq, theta_dist)
+        normalize_add_wgn(labels, data, snr)
+
+        return labels, data
+    
+    if not check_data_exists(training):
+        labels, data = generate_bulk_data(training_size, N, K, L, freq, theta_dist)
+        save_generated_data(training, labels, data)
+        return labels, data
+        
+    training_labels, training_data  = load_generated_data(training)
+    
+    normalize_add_wgn(training_labels, training_data, snr)
+
+    return training_labels, training_data
 
 def normalize(labels, data, theta_bound = np.pi/2):
     max_theta = theta_bound
@@ -94,18 +116,8 @@ def normalize(labels, data, theta_bound = np.pi/2):
     data[:] = data[:]/np.max(data[:])
     
     #return labels,data
+
+def normalize_add_wgn(labels, data, snr, theta_bound = np.pi/2):
+    data = apply_wgn(data, snr)
     
-def data_initialization(training_size, N, K, L, freq, theta_dist = 'uniform', sort=True):
-    training = f"data/RBN_training_N={N}_K={K}_L={L}_sort={sort}"
-    if not check_data_exists(training):
-        labels, data = generate_bulk_data(training_size, N, K, L, freq, theta_dist, sort)
-        save_generated_data(training, labels, data)
-        
-    training_labels, training_data  = load_generated_data(training)
-
-    return training_labels, training_data
-
-def normalize_add_wgn(labels, data, L, snr):
-    data = apply_wgn(data, L, snr)
-
     normalize(labels, data)

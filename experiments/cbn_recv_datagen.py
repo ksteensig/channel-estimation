@@ -3,7 +3,7 @@ import numpy.random as rand
 from os.path import isfile
 
 # SNR is a range between min and max SNR in dB
-def generate_single_data(N, K, f, theta_bound = np.pi/2, theta_dist = 'uniform', sort = False):
+def generate_single_data(N, K, f, res=180, theta_bound = np.pi/2, theta_dist = 'uniform'):
     c = 3e8 # speed of light
     wl = c/f # wavelength (lambda)
     d = wl/2 # uniform distance between antennas
@@ -33,10 +33,12 @@ def generate_single_data(N, K, f, theta_bound = np.pi/2, theta_dist = 'uniform',
     
     yl_split = np.concatenate((yl.real,yl.imag), axis=1)
     
-    if sort:
-        theta = np.sort(theta, axis=0)
+    theta = np.floor(((theta - theta_bound)/(2*theta_bound)*res)).astype(int)
+    
+    theta_grid = np.zeros((res, 1))
+    theta_grid[theta] = 1
         
-    return theta.T, yl_split
+    return theta_grid.T, yl_split
 
 def apply_wgn(Y, L, SNR):
     shape = Y.shape
@@ -49,14 +51,13 @@ def apply_wgn(Y, L, SNR):
         
     return Y + rand.randn(*shape)*np.sqrt(0.5/db2pow)
 
-def generate_bulk_data(data_points, N, K, L, freq, dist = 'uniform', sort = False):
-    data = np.zeros((data_points*L,2*N))
-    labels = np.zeros((data_points*L,K))
+def generate_bulk_data(data_points, N, K, L, freq = 2.4e9, res=180, dist = 'uniform'):
+    data = np.zeros((data_points*L, 2*N))
+    labels = np.zeros((data_points*L, res))
     
     for i in range(data_points):
-        theta,yl = generate_single_data(N, K, freq, theta_bound=np.pi/2, theta_dist = dist,sort = sort)
+        theta, yl = generate_single_data(N, K, freq, res, theta_bound=np.pi/2, theta_dist = dist)
         Theta, Y = np.repeat(theta, L, axis=0), np.repeat(yl, L, axis=0)
-        
         start = L*i
         end = start + L
         
@@ -64,7 +65,6 @@ def generate_bulk_data(data_points, N, K, L, freq, dist = 'uniform', sort = Fals
         labels[start:end, :] = Theta
             
     return labels, data
-
 
 def save_generated_data(filename, labels, data):    
     with open(filename + '_data.npy', 'wb') as f:
@@ -85,27 +85,23 @@ def load_generated_data(filename):
 
 def check_data_exists(filename):
     return isfile(filename + '_data.npy') and isfile(filename + '_labels.npy')
-
-def normalize(labels, data, theta_bound = np.pi/2):
-    max_theta = theta_bound
-    min_theta = -max_theta
-        
-    labels[:] = (labels[:] - min_theta)/(max_theta - min_theta) # normalize labels to [0,1]
-    data[:] = data[:]/np.max(data[:])
     
-    #return labels,data
+def data_initialization(training_size, N, K, L, freq, res, snr, theta_dist = 'uniform', cache = True):
+    training = f"data/CBN_recv_training_N={N}_K={K}_L={L}"
     
-def data_initialization(training_size, N, K, L, freq, theta_dist = 'uniform', sort=True):
-    training = f"data/RBN_training_N={N}_K={K}_L={L}_sort={sort}"
+    if not cache:
+        labels, data = generate_bulk_data(training_size, N, K, L, freq, res, theta_dist)
+        return labels, data
+    
     if not check_data_exists(training):
-        labels, data = generate_bulk_data(training_size, N, K, L, freq, theta_dist, sort)
+        labels, data = generate_bulk_data(training_size, N, K, L, freq, res, theta_dist)
         save_generated_data(training, labels, data)
+        return labels, data
         
     training_labels, training_data  = load_generated_data(training)
 
     return training_labels, training_data
 
-def normalize_add_wgn(labels, data, L, snr):
+def normalize_add_wgn(labels, data, L, snr):    
     data = apply_wgn(data, L, snr)
-
-    normalize(labels, data)
+    data[:] = data[:]/np.max(data[:])

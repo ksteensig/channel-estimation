@@ -25,19 +25,17 @@ testing_size = 1000
 N = 16
 
 # users
-K = 4
+K = 8
 
 # frequency
-freq = 1e9
+freq = 2.4e9
 
 # bits
 L = 16
 
 snr = [5, 30]
 
-learning_rate = 0.001
-
-model = load_model(f"models/RBN_N={N}_K={K}_L={L}_lr={learning_rate}")
+model = load_model(f"models/RBN_N={N}_K={K}_L={L}")
 
 pos = {
        'uniform': (0,0),
@@ -58,7 +56,7 @@ fig2.set_size_inches(18, 18)
 for dist in ['uniform','zeros','ones']:
     labels, data = dg.generate_bulk_data(testing_size, N, K, L, freq, dist, sort = True)
     data = dg.apply_wgn(data, L, snr)
-    dg.normalize(labels, data) 
+    dg.normalize(labels, data)
     
     #loss, mse = model.evaluate(data, labels, verbose=2)
     
@@ -75,7 +73,7 @@ for dist in ['uniform','zeros','ones']:
     
     ax[r].set_title(dist)
     ax[r].set_xlabel(r'$\theta_k$')
-    ax[r].set_ylabel(r'$\mathrm{mean}(\mathrm{var}(\theta_k))$')
+    ax[r].set_ylabel(r'$\mathrm{var}(error_k)$')
     
     ax2[r].set_title(dist)
     ax2[r].set_xlabel(r'$\theta_k$')
@@ -84,7 +82,7 @@ for dist in ['uniform','zeros','ones']:
     # plot mean and variance
     for i in range(K):
         xlabel = r'$\theta_{' + str(i+1) + '}$'
-        ax[r].plot(xlabel, k[:,i].var(), 'x', color='b')
+        ax[r].plot(xlabel, (k[:,i]).var(), 'x', color='b')
         ax[r].plot(xlabel, labels[:,i].var(), 'o', color='r')
         ax2[r].plot(xlabel, k[:,i].mean(), 'x', color='b')
         ax2[r].plot(xlabel, labels[:,i].mean(), 'o', color='r')

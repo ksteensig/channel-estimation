@@ -49,7 +49,7 @@ def apply_wgn(Y, L, SNR):
         
     return Y + rand.randn(*shape)*np.sqrt(0.5/db2pow)
 
-def generate_bulk_data(data_points, N, K, L, freq, dist = 'uniform', sort = False):
+def generate_bulk_data(data_points, N, K, L, freq = 2.4e9, dist = 'uniform', sort = False):
     data = np.zeros((data_points*L,2*N))
     labels = np.zeros((data_points*L,K))
     

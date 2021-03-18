@@ -38,30 +38,32 @@ def generate_single_data(N, K, f, res=180, theta_bound = np.pi/2, theta_dist = '
         
     return theta_grid.T, yl.T
 
-def apply_wgn(Y, SNR):
+def apply_wgn(Y, L, SNR):
     shape = Y.shape
 
-    db2pow = 10**(rand.uniform(SNR[0], SNR[1], size=(shape[0],1))/10)
+    # Y consists of L-repeats of different y's
+    # all identical y's must use the same SNR
+    db2pow = 10**(rand.uniform(SNR[0], SNR[1], size=(int(shape[0]/L),1))/10)
+    db2pow = np.repeat(db2pow, L, axis=1)
+    db2pow = db2pow.flatten().reshape((shape[0], 1))
     
-    n = int(np.sqrt(shape[1]/2))
-    
-    N = np.eye(n,n).reshape(n**2)*(0.5/db2pow)
-        
-    Y[:,:n**2] += N
-    
-    return Y
+    return Y + rand.randn(*shape)*np.sqrt(0.5/db2pow) + 1j*rand.randn(*shape)*np.sqrt(0.5/db2pow)
 
-def generate_bulk_data(data_points, N, K, L, freq, res=180, dist = 'uniform'):
-    data = np.zeros((data_points, L, N), dtype=np.complex64)
+def generate_bulk_data(data_points, N, K, L, freq=2.4e9, res=180, dist = 'uniform'):
+    data = np.zeros((data_points*L,N), dtype=np.complex64)
     labels = np.zeros((data_points, res))
     
     for i in range(data_points):
         theta,yl = generate_single_data(N, K, freq, res, theta_bound=np.pi/2, theta_dist = dist)
+        Y = np.repeat(yl, L, axis=0)
         
-        data[i, :, :] = np.repeat(yl, L, axis=0)
+        start = L*i
+        end = start + L
+        
+        data[start:end, :] = Y
         labels[i, :] = theta
             
-    return labels, compute_cov(data)
+    return labels, data
 
 def compute_cov(data):
     shape = data.shape
@@ -106,6 +108,8 @@ def data_initialization(training_size, N, K, L, freq, res, snr, theta_dist = 'un
 
     return training_labels, training_data
 
-def normalize_add_wgn(labels, data, snr):    
-    data = apply_wgn(data, snr)
-    data[:] = data[:]/np.max(data[:])
+def normalize(data, snr):    
+    #data = data - np.min(data, axis=1).reshape(len(data), 1)
+    #data = data - np.min(data, axis=1).reshape((len(data), 1))
+    data = data / np.max(np.abs(data), axis=1).reshape((len(data), 1))
+    return data

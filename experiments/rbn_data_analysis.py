@@ -88,7 +88,7 @@ for dist in ['uniform','zeros','ones']:
         ax2[r].plot(xlabel, labels[:,i].mean(), 'o', color='r')
     
 
-fig.savefig('nn_doa_v1_variance.eps', format='eps')    
+fig.savefig('nn_doa_v1_variance.eps', format='eps')
 fig2.savefig('nn_doa_v1_mean.eps', format='eps')    
 
 fig.show()

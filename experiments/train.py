@@ -4,7 +4,7 @@ import cbn_recv as cbn_recv
 import rbn as rbn
 import rbn_cov as rbn_cov
 
-training_size = 500000
+training_size = 200000
 validation_size = 0.1 # 10% of training size
 
 # receiver antennas
@@ -19,7 +19,7 @@ snr = [5, 30]
 learning_rate = 0.001
 
 resolution = 180
-
+"""
 for k in [4, 8]:
     model_rbn = rbn_cov.train_model(N, k, L,
                                    snr = snr,
@@ -27,15 +27,6 @@ for k in [4, 8]:
                                    validation_size=validation_size,
                                    learning_rate=learning_rate,
                                    sort=False)
-    
-
-for k in [4, 8]:
-    model_cbn = cbn.train_model(N, k, L,
-                                   snr = snr,
-                                   resolution = resolution,
-                                   training_size = training_size,
-                                   validation_size=validation_size,
-                                   learning_rate=learning_rate)
 
 
 for k in [4, 8]:
@@ -45,10 +36,19 @@ for k in [4, 8]:
                                    validation_size=validation_size,
                                    learning_rate=learning_rate,
                                    sort=False)
-    
 
-for k in [4, 8]:
+
+for k in [4]:
     model_cbn = cbn_recv.train_model(N, k, L,
+                                   snr = snr,
+                                   resolution = resolution,
+                                   training_size = training_size,
+                                   validation_size=validation_size,
+                                   learning_rate=learning_rate)
+
+"""
+for k in [8]:
+    model_cbn = cbn.train_model(N, k, L,
                                    snr = snr,
                                    resolution = resolution,
                                    training_size = training_size,

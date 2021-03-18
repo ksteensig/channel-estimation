@@ -12,8 +12,7 @@ import pandas as pd
 import scipy
 from scipy.signal import find_peaks
 
-import cbn_datagen as dg
-import cbn_recv_datagen as dg_
+import cbn_ae_datagen as dg
 
 print('TensorFlow Version:', tf.__version__)
 
@@ -29,7 +28,7 @@ freq = 2.4e9
 # bits
 L = 16
 
-min_snr = 5
+min_snr = 30
 max_snr = 30
 
 # snr between 5 and 30
@@ -39,32 +38,34 @@ learning_rate = 0.001
 
 resolution = 180
 
-labels, data = dg.data_initialization(1, N, K, L, freq, resolution, snr, cache=False)
-
-data = dg.apply_wgn(data, L, snr).reshape((1, L, N))
+labels, data = dg.data_initialization(1, N, K, L, freq, 180, snr, cache=False)
     
-data = dg.compute_cov(data)/L
+training_size = int(len(data)/L)
     
-data = dg.normalize(data, snr)
+#data = dg.apply_wgn(data, L, snr)
 
-labels_, data_ = dg_.generate_bulk_data(1, N, K, L)
-data_ = dg_.normalize_add_wgn(data_, L, [1000,1000])
+data2 = np.mean(data.copy(), axis=0)
 
-data_ = data_[:, list(range(0,N))+list(range(-1,-(N+1), -1))]
+data = data.reshape((training_size, N*L))
 
-model = load_model(f"models/CBN_N={N}_K={K}_L={L}")
-model_ = load_model(f"models/CBN_row_N={N}_K={K}_L={L}")
+data = np.concatenate((data.real,data.imag), axis=1)
+data = data / np.max(np.abs(data), axis=1).reshape((training_size,1))
 
-prediction = model_.predict(data_)
+model = load_model(f"models/CBN_ae_N={N}_K={K}_L={L}")
 
-res = prediction[0] / np.max(prediction[0])
 
-plt.plot(labels_[0])
-plt.plot(res)
+prediction = model.predict(data)
 
+res = prediction[0] / np.max(np.abs(prediction[0]))
+
+plt.figure(0)
+
+plt.plot(labels[0], color='b')
+plt.plot(res, color='r')
 peaks = find_peaks(res, 0.05)[0]
-
 plt.plot(peaks, res[peaks], 'x')
+
+
 
 #plt.show()
 

@@ -3,7 +3,7 @@ import numpy.random as rand
 from os.path import isfile
 
 # SNR is a range between min and max SNR in dB
-def generate_single_data(N, K, f, theta_bound = np.pi/2, theta_dist = 'uniform', sort = False):
+def generate_single_data(N, K, f, res=180, theta_bound = np.pi/2, theta_dist = 'uniform'):
     c = 3e8 # speed of light
     wl = c/f # wavelength (lambda)
     d = wl/2 # uniform distance between antennas
@@ -30,43 +30,26 @@ def generate_single_data(N, K, f, theta_bound = np.pi/2, theta_dist = 'uniform',
     response = array_response(array, theta)
         
     yl = np.inner(response.T, alpha.T)
+            
+    theta = np.floor(((theta - theta_bound)/(2*theta_bound)*res)).astype(int)
     
-    if sort:
-        theta = np.sort(theta, axis=0)
+    theta_grid = np.zeros((res, 1))
+    theta_grid[theta] = 1
         
-    return theta.T, yl.T
+    return theta_grid.T, yl.T
 
-def apply_wgn(Y, SNR):
-    shape = Y.shape
 
-    db2pow = 10**(rand.uniform(SNR[0], SNR[1], size=(shape[0],1))/10)
-    
-    n = int(np.sqrt(shape[1]/2))
-    
-    N = np.eye(n,n).reshape(n**2)*(0.5/db2pow)
-        
-    Y[:,:n**2] += N
-    
-    return Y
-
-def generate_bulk_data(data_points, N, K, L, freq = 2.4e9, dist = 'uniform', sort = False):
+def generate_bulk_data(data_points, N, K, L, freq = 2.4e9, res=180, dist = 'uniform'):
     data = np.zeros((data_points, L, N), dtype=np.complex64)
-    labels = np.zeros((data_points, K))
+    labels = np.zeros((data_points, res))
     
     for i in range(data_points):
-        theta,yl = generate_single_data(N, K, freq, theta_bound=np.pi/2, theta_dist = dist, sort = sort)
+        theta,yl = generate_single_data(N, K, freq, res, theta_bound=np.pi/2, theta_dist = dist)
         
         data[i, :, :] = np.repeat(yl, L, axis=0)
         labels[i, :] = theta
-            
-    return labels, compute_cov(data)/L
-
-def compute_cov(data):
-    shape = data.shape
-    data = np.matmul(data.transpose((0,2,1)), data).reshape((shape[0], shape[2]**2))
-    data = np.concatenate((data.real,data.imag), axis=1)
-    
-    return data
+                    
+    return labels, np.concatenate((data.real,data.imag), axis=2)
 
 def save_generated_data(filename, labels, data):    
     with open(filename + '_data.npy', 'wb') as f:
@@ -88,17 +71,17 @@ def load_generated_data(filename):
 def check_data_exists(filename):
     return isfile(filename + '_data.npy') and isfile(filename + '_labels.npy')
     
-def data_initialization(training_size, N, K, L, freq, snr, theta_dist = 'uniform', cache = True):
-    training = f"data/RBN_cov_training_N={N}_K={K}_L={L}"
+def data_initialization(training_size, N, K, L, freq, res, snr, theta_dist = 'uniform', cache = True):
+    training = f"data/CBN_LSTM_training_N={N}_K={K}_L={L}"
     
     if not cache:
-        labels, data = generate_bulk_data(training_size, N, K, L, freq, theta_dist)
+        labels, data = generate_bulk_data(training_size, N, K, L, freq, res, theta_dist)
         normalize_add_wgn(labels, data, snr)
 
         return labels, data
     
     if not check_data_exists(training):
-        labels, data = generate_bulk_data(training_size, N, K, L, freq, theta_dist)
+        labels, data = generate_bulk_data(training_size, N, K, L, freq, res, theta_dist)
         save_generated_data(training, labels, data)
         return labels, data
         
@@ -108,16 +91,6 @@ def data_initialization(training_size, N, K, L, freq, snr, theta_dist = 'uniform
 
     return training_labels, training_data
 
-def normalize(labels, data, theta_bound = np.pi/2):
-    max_theta = theta_bound
-    min_theta = -max_theta
-        
-    labels[:] = (labels[:] - min_theta)/(max_theta - min_theta) # normalize labels to [0,1]
+def normalize_add_wgn(labels, data, snr):    
+    #data = apply_wgn(data, snr)
     data[:] = data[:]/np.max(data[:])
-    
-    #return labels,data
-
-def normalize_add_wgn(labels, data, snr, theta_bound = np.pi/2):
-    data = apply_wgn(data, snr)
-    
-    normalize(labels, data)

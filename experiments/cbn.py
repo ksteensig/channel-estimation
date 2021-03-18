@@ -15,10 +15,18 @@ import cbn_datagen as dg
 # L: bits
 # freq: frequency
 # snr between 5 and 30
-def train_model(N, K, L, freq = 2.4e9, snr = [5, 30], resolution = 180, training_size = 500000, validation_size = 0.1, learning_rate = 0.001):
+def train_model(N = 16, K = 4, L = 16, freq = 2.4e9, snr = [5, 30], resolution = 180, training_size = 200000, validation_size = 0.1, learning_rate = 0.001):
     training_labels, training_data = dg.data_initialization(training_size, N, K, L, freq, resolution, snr, cache=True)    
     
-    dg.normalize_add_wgn(training_labels, training_data, snr)
+    training_data = dg.apply_wgn(training_data, L, snr).reshape((training_size, L, N))
+    
+    training_data = dg.compute_cov(training_data)/L
+    
+    training_data = dg.normalize(training_data, snr)
+    
+    #training_data = training_data[:, list(range(0,N))+list(range(-1,-(N+1), -1))]
+    
+    #print(training_data.shape)
     
     training_data, validation_data, training_labels, validation_labels = train_test_split(training_data, training_labels, test_size=validation_size, shuffle=True)
     
@@ -33,12 +41,11 @@ def train_model(N, K, L, freq = 2.4e9, snr = [5, 30], resolution = 180, training
     
     adam = keras.optimizers.Adam(learning_rate=learning_rate, beta_1=0.9, beta_2=0.999)
     
-    stopping = keras.callbacks.EarlyStopping(monitor='val_loss', patience=4, min_delta=1e-4)
+    stopping = keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, min_delta=1e-5)
     lrate = keras.callbacks.LearningRateScheduler(adaptive_learning_rate)
 
     model.compile(optimizer=adam,
-                  loss='binary_crossentropy',
-                  metrics=['accuracy'])
+                  loss='binary_crossentropy')
     
     m = model.fit(training_data, training_labels, batch_size=32, epochs=300, validation_data=(validation_data, validation_labels), callbacks=[stopping, lrate])
 

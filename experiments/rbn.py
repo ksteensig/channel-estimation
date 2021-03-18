@@ -32,7 +32,7 @@ def train_model(N = 16, K = 4, L = 16, freq = 2.4e9, training_size = 500000, val
     
     
     lrate = tf.keras.callbacks.LearningRateScheduler(adaptive_learning_rate)
-    stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=4, min_delta=1e-4)
+    stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, min_delta=1e-5)
 
     model.compile(optimizer=adam,
                   loss='mse',

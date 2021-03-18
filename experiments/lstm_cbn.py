@@ -7,7 +7,6 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import numpy as np
 from resnet import ResnetBlock
-import pickle
 
 import cbn_datagen as dg
 
@@ -17,15 +16,20 @@ import cbn_datagen as dg
 # freq: frequency
 # snr between 5 and 30
 def train_model(N, K, L, freq = 2.4e9, snr = [5, 30], resolution = 180, training_size = 500000, validation_size = 0.1, learning_rate = 0.001):
-    training_labels, training_data = dg.data_initialization(training_size, N, K, L, freq, resolution, snr, cache=True)
+    training_labels, training_data = dg.data_initialization(training_size, N, K, L, freq, resolution, snr, cache=False)
+    
+    training_data = training_data.reshape((training_size,N,2*N))
+    #print(training_data.shape)
     
     training_data, validation_data, training_labels, validation_labels = train_test_split(training_data, training_labels, test_size=validation_size, shuffle=False)
     
     # define model
     model = keras.Sequential([
-            keras.layers.Dense(resolution),
-            ResnetBlock(resolution, 3),
-            keras.layers.Dense(resolution, activation='sigmoid')
+            keras.layers.GRU(2*N),
+            #keras.layers.Dense(2*N, activation='relu'),
+            keras.layers.Dense(2*K, activation='relu'),
+            keras.layers.Dropout(0.1),
+            keras.layers.Dense(resolution, activation='sigmoid', activity_regularizer=keras.regularizers.l1(l1=0.01))   
             ])
     
     adaptive_learning_rate = lambda epoch: learning_rate/(2**np.floor(epoch/10))
@@ -35,15 +39,10 @@ def train_model(N, K, L, freq = 2.4e9, snr = [5, 30], resolution = 180, training
     stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=4, min_delta=1e-4)
     lrate = tf.keras.callbacks.LearningRateScheduler(adaptive_learning_rate)
 
-    model.compile(optimizer=adam,
-                  loss='binary_crossentropy',
-                  metrics=['accuracy'])
+    model.compile(optimizer=adam, loss=tf.keras.losses.BinaryCrossentropy())
 
     m = model.fit(training_data, training_labels, batch_size=32, epochs=300, validation_data=(validation_data, validation_labels), callbacks=[stopping, lrate])
-    
-    with open(f"history/CBN_resnet_N={N}_K={K}_L={L}", 'wb') as f:
-        pickle.dump(m.history, f)
 
-    model.save(f"models/CBN_resnet_N={N}_K={K}_L={L}")
+    model.save(f"models/CBN_LSTM_N={N}_K={K}_L={L}")
 
     return model

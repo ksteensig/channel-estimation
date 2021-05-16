@@ -2,6 +2,7 @@ from lista import data_generation, add_noise, train_lista, train_lista_toeplitz,
 import tensorflow as tf
 import numpy as np
 
+#tf.config.experimental.enable_mlir_graph_optimization()
 
 K_list = [4, 8]
 

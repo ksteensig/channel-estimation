@@ -27,6 +27,8 @@ def generate_signal(N = 16, K = 4, L = 16, f = 2.4e9, theta_bound = np.pi/2):
                 
     return theta, Y, alpha
 
+rads_to_vector = lambda x, D: np.floor((x + np.pi/2)/np.pi * D).astype(int)
+
 def compute_H(theta, N, f = 2.4e9):
     c = 3e8 # speed of light
     wl = c/f # wavelength (lambda)
@@ -87,12 +89,9 @@ class LISTA(tf.keras.Model):  #@save
         self.alpha = tf.Variable(0.1, dtype=tf.float32)
 
     def call(self, Y):
-        print('hi')
         Y_r = tf.math.real(Y)
         Y_i = tf.math.imag(Y)
         
-        print(Y_r.dtype)
-        print(Y_r.shape)
                 
         X_r = mul_Y(self.We_r, Y_r)
         X_r = soft_block_thresh(X_r, self.lam_list[0], self.alpha, self.T)
@@ -180,7 +179,7 @@ def data_generation(N, K, T, D, samples):
         Y[i] = Yi
         Theta[i] = theta.flatten()
         
-        idx = rads_to_vector(theta)
+        idx = rads_to_vector(theta, D)
         labels[i, idx, :] = np.repeat(alpha, repeats=T, axis=0).reshape((K,1,T))
     
     #Y = Y.reshape((samplesT, N_max))
@@ -205,7 +204,7 @@ def add_noise(data, T, N, SNR, samples):
     return data
 
 def train_lista(data, labels, N, K, T, D):
-    lista_model = LISTA_Toeplitz(3, D, N, T)
+    lista_model = LISTA(3, D, N, T)
 
     learning_rate = 0.001
     

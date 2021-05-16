@@ -50,9 +50,10 @@ def soft_block_thresh(Z, l, alpha, T):
 mul_X = lambda w, x: tf.transpose(tf.tensordot(w, x, axes=[[1],[1]]), [1,0,2])
 mul_Y = lambda w, y: tf.transpose(tf.tensordot(w, y, axes=[[1],[1]]), [1,0,2])
 
-transform_X = lambda x: tf.transpose(tf.expand_dims(x, 2), [0,3,1,2])
-transform_hgX = lambda x: tf.squeeze(tf.transpose(x, [0,2,1,3]), axis=3)
-conv_X = lambda hg, x: transform_hgX(hg(transform_X(x)))
+#transform_X = lambda x: tf.transpose(tf.expand_dims(x, 2), [0,3,1,2])
+#transform_hgX = lambda x: tf.squeeze(tf.transpose(x, [0,2,1,3]), axis=3)
+#conv_X = lambda hg, x: transform_hgX(hg(transform_X(x)))
+conv_X = lambda hg, x: hg(x)
 
 class LISTA(tf.keras.Model):  #@save
     def __init__(self, num_iter, D, N, T):
@@ -100,8 +101,6 @@ class LISTA(tf.keras.Model):  #@save
 
         for i in range(1, self.num_iter):
             X_r = mul_X(self.Wt_r, X_r) - mul_X(self.Wt_i, X_i) + mul_Y(self.We_r, Y_r) - mul_Y(self.We_i, Y_i)
-            #print(X_r.shape)
-            
             X_r = soft_block_thresh(X_r, self.lam_list[i], self.alpha, self.T)
             X_i = mul_X(self.Wt_r, X_i) + mul_X(self.Wt_i, X_r) + mul_Y(self.We_r, Y_i) + mul_Y(self.We_i, Y_r)
             X_i = soft_block_thresh(X_i, self.lam_list[i], self.alpha, self.T)
@@ -130,11 +129,11 @@ class LISTA_Toeplitz(tf.keras.Model):  #@save
         
         We_initial = 2 * step_size * H.T.conj()
         
-        self.hg_r_ = tf.keras.layers.Conv1D(1, 2*D-1, activation='linear', padding='same')
-        self.hg_i_ = tf.keras.layers.Conv1D(1, 2*D-1, activation='linear', padding='same')
+        self.hg_r = tf.keras.layers.Conv1D(T, 2*D-1, activation='linear', padding='same', use_bias=False)
+        self.hg_i = tf.keras.layers.Conv1D(T, 2*D-1, activation='linear', padding='same', use_bias=False)
         
-        self.hg_r = tf.keras.layers.TimeDistributed(self.hg_r_)
-        self.hg_i = tf.keras.layers.TimeDistributed(self.hg_i_)
+        #self.hg_r = tf.keras.layers.TimeDistributed(self.hg_r_)
+        #self.hg_i = tf.keras.layers.TimeDistributed(self.hg_i_)
         
         self.We_r = tf.Variable(We_initial.real.copy(), dtype=tf.float32)
         self.We_i = tf.Variable(We_initial.imag.copy(), dtype=tf.float32)
@@ -203,8 +202,8 @@ def add_noise(data, T, N, SNR, samples):
     
     return data
 
-def train_lista(data, labels, N, K, T, D):
-    lista_model = LISTA(3, D, N, T)
+def train_lista(num_iter, data, labels, N, K, T, D):
+    lista_model = LISTA(num_iter, D, N, T)
 
     learning_rate = 0.001
     
@@ -217,15 +216,15 @@ def train_lista(data, labels, N, K, T, D):
     
     lista_model.compile(optimizer=adam, loss='mse')
     
-    m = lista_model.fit(data, labels, batch_size=32, epochs=20, validation_split=0.1, callbacks=[stopping, lrate])
+    m = lista_model.fit(data, labels, batch_size=32, epochs=200, validation_split=0.1, callbacks=[stopping, lrate])
     
     with open(f"history/LISTA_N={N}_K={K}_T={T}", 'wb') as f:
         pickle.dump(m.history, f)
 
-    m.save(f"models/LISTA_N={N}_K={K}_T={T}")
+    lista_model.save(f"models/LISTA_N={N}_K={K}_T={T}")
 
-def train_lista_toeplitz(data, labels, N, K, T, D):
-    lista_model = LISTA_Toeplitz(3, D, N, T)
+def train_lista_toeplitz(num_iter, data, labels, N, K, T, D):
+    lista_model = LISTA_Toeplitz(num_iter, D, N, T)
 
     learning_rate = 0.001
     
@@ -238,11 +237,11 @@ def train_lista_toeplitz(data, labels, N, K, T, D):
     
     lista_model.compile(optimizer=adam, loss='mse')
     
-    m = lista_model.fit(data, labels, batch_size=32, epochs=20, validation_split=0.1, callbacks=[stopping, lrate])
+    m = lista_model.fit(data, labels, batch_size=32, epochs=200, validation_split=0.1, callbacks=[stopping, lrate])
     
     with open(f"history/LISTA_Toeplitz_N={N}_K={K}_T={T}", 'wb') as f:
         pickle.dump(m.history, f)
 
-    m.save(f"models/LISTA_Toeplitz_N={N}_K={K}_T={T}")
+    lista_model.save(f"models/LISTA_Toeplitz_N={N}_K={K}_T={T}")
     
     

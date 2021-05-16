@@ -26,5 +26,7 @@ for K in K_list:
 
     
     for T in T_list:
-        train_lista(data[:,:,:T], labels[:,:,:T], N, K, T, D)
-        train_lista_toeplitz(data[:,:,:T], labels[:,:,:T], N, K, T, D)
+        train_lista_toeplitz(num_iter, data[:,:,:T], labels[:,:,:T], N, K, T, D)
+        train_lista(num_iter, data[:,:,:T], labels[:,:,:T], N, K, T, D)
+        
+        

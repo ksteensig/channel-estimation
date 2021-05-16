@@ -15,7 +15,7 @@ D = 180
 
 SNR = [5,30]
 
-samples = 1000
+samples = 200000
 
 num_iter = 3
 
@@ -25,5 +25,5 @@ for K in K_list:
 
     
     for T in T_list:
-        train_lista(data[:,:,:T], labels[:,:,:T], N, K, T)
-        train_lista_toeplitz(data[:,:,:T], labels[:,:,:T], N, K, T)
+        train_lista(data[:,:,:T], labels[:,:,:T], N, K, T, D)
+        train_lista_toeplitz(data[:,:,:T], labels[:,:,:T], N, K, T, D)

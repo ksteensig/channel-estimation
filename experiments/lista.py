@@ -1,10 +1,8 @@
 import numpy as np
-import numpy.random as rand
-import numpy.linalg as linalg
-from sklearn.metrics import mean_squared_error
-import matplotlib.pyplot as plt
+#from sklearn.metrics import mean_squared_error
+#import matplotlib.pyplot as plt
 import tensorflow as tf
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import pickle
 
 
@@ -17,7 +15,7 @@ def generate_signal(N = 16, K = 4, L = 16, f = 2.4e9, theta_bound = np.pi/2):
     # antenna array
     array = np.linspace(0,N-1,N)*d/wl
 
-    theta = rand.rand(K,1) * np.pi - np.pi/2
+    theta = np.random.rand(K,1) * np.pi - np.pi/2
 
     
     alpha = (np.random.randn(K,1) + 1j*np.random.randn(K,1))*np.sqrt(1/2)
@@ -28,24 +26,6 @@ def generate_signal(N = 16, K = 4, L = 16, f = 2.4e9, theta_bound = np.pi/2):
 
                 
     return theta, Y, alpha
-
-K = 4
-T = 2
-D = 180
-N = 64
-
-samples = 10000
-
-rads_to_vector = lambda x: np.floor((x + np.pi/2)/np.pi * D).astype(int)
-
-
-N_list = N #[16, 32, 48, 64, 96]
-
-SNR_list = [5,10,15,20,25,30]
-
-N_max = np.max(N_list)
-
-
 
 def compute_H(theta, N, f = 2.4e9):
     c = 3e8 # speed of light
@@ -213,7 +193,7 @@ def data_generation(N, K, T, D, samples):
     return data, labels
 
 def add_noise(data, T, N, SNR, samples):    
-    db2pow = 10**(rand.uniform(SNR[0], SNR[1], size=(samples,1))/10)
+    db2pow = 10**(np.random.uniform(SNR[0], SNR[1], size=(samples,1))/10)
     
     db2pow = tf.expand_dims(db2pow, axis=-1)
     db2pow = tf.tile(db2pow, multiples=[1,N,T])
@@ -224,7 +204,7 @@ def add_noise(data, T, N, SNR, samples):
     
     return data
 
-def train_lista(data, labels, N, K, T):
+def train_lista(data, labels, N, K, T, D):
     lista_model = LISTA_Toeplitz(3, D, N, T)
 
     learning_rate = 0.001
@@ -245,7 +225,7 @@ def train_lista(data, labels, N, K, T):
 
     m.save(f"models/LISTA_N={N}_K={K}_T={T}")
 
-def train_lista_toeplitz(data, labels, N, K, T):
+def train_lista_toeplitz(data, labels, N, K, T, D):
     lista_model = LISTA_Toeplitz(3, D, N, T)
 
     learning_rate = 0.001

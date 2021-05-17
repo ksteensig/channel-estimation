@@ -3,7 +3,7 @@ import numpy.random as rand
 from os.path import isfile
 
 # SNR is a range between min and max SNR in dB
-def generate_single_data(N, K, f, theta_bound = np.pi/2, theta_dist = 'uniform', sort = False):
+def generate_single_data(N, K, f, theta_bound = np.pi/2, theta_ = None):
     c = 3e8 # speed of light
     wl = c/f # wavelength (lambda)
     d = wl/2 # uniform distance between antennas
@@ -14,16 +14,10 @@ def generate_single_data(N, K, f, theta_bound = np.pi/2, theta_dist = 'uniform',
     # steering vector
     array_response = lambda array,theta: np.exp(-1j*2*np.pi*array*np.sin(theta))*np.sqrt(1/N)
 
-    theta = np.zeros((K,1))
-    
-    if theta_dist == 'uniform':
+    if theta_ is None:
         theta = 2*theta_bound*np.random.rand(K,1) - theta_bound
-    elif theta_dist == 'normal':
-        theta = np.random.randn(K,1)
-    elif theta_dist == 'zeros':
-        pass
-    elif theta_dist == 'ones':
-        theta = np.ones((K,1))
+    else:
+        theta = theta_.copy().reshape((K,1))  
     
     
     alpha = (np.random.randn(K,1) + 1j*np.random.randn(K,1))*np.sqrt(1/2)
@@ -33,8 +27,6 @@ def generate_single_data(N, K, f, theta_bound = np.pi/2, theta_dist = 'uniform',
     
     yl_split = np.concatenate((yl.real,yl.imag), axis=1)
     
-    if sort:
-        theta = np.sort(theta, axis=0)
         
     return theta.T, yl_split
 
@@ -49,12 +41,17 @@ def apply_wgn(Y, L, SNR):
         
     return Y + rand.randn(*shape)*np.sqrt(0.5/db2pow)
 
-def generate_bulk_data(data_points, N, K, L, freq = 2.4e9, dist = 'uniform', sort = False):
+def generate_bulk_data(data_points, N, K, L, freq = 2.4e9, theta_ = None):
     data = np.zeros((data_points*L,2*N))
     labels = np.zeros((data_points*L,K))
     
     for i in range(data_points):
-        theta,yl = generate_single_data(N, K, freq, theta_bound=np.pi/2, theta_dist = dist,sort = sort)
+        if theta_ is None:
+            theta = None
+        else:
+            theta = theta_[:,i]
+            
+        theta,yl = generate_single_data(N, K, freq, theta_bound=np.pi/2, theta_ = theta)
         Theta, Y = np.repeat(theta, L, axis=0), np.repeat(yl, L, axis=0)
         
         start = L*i

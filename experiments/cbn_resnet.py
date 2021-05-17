@@ -17,9 +17,15 @@ import cbn_datagen as dg
 # freq: frequency
 # snr between 5 and 30
 def train_model(N, K, L, freq = 2.4e9, snr = [5, 30], resolution = 180, training_size = 500000, validation_size = 0.1, learning_rate = 0.001):
-    training_labels, training_data = dg.data_initialization(training_size, N, K, L, freq, resolution, snr, cache=True)
+    training_labels, training_data = dg.data_initialization(training_size, N, K, L, freq, resolution, snr, cache=True)    
     
-    training_data, validation_data, training_labels, validation_labels = train_test_split(training_data, training_labels, test_size=validation_size, shuffle=False)
+    training_data = dg.apply_wgn(training_data, L, snr).reshape((training_size, L, N))
+    
+    training_data = dg.compute_cov(training_data)/L
+    
+    training_data = dg.normalize(training_data, snr)
+    
+    training_data, validation_data, training_labels, validation_labels = train_test_split(training_data, training_labels, test_size=validation_size, shuffle=True)
     
     # define model
     model = keras.Sequential([

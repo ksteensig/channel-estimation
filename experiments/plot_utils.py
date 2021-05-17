@@ -14,8 +14,9 @@ import tensorflow as tf
 import pickle
 import numpy as np
 import scipy
-from scipy.signal import find_peaks
 from sklearn.metrics import classification_report
+
+from sklearn.metrics import mean_squared_error
 
 from metrics import *
 
@@ -28,7 +29,7 @@ N = 16
 # bits
 L = 16
 
-K = 4 # 8
+K = 8
 
 # snr between 5 and 30 dB
 snr = [5, 30]
@@ -40,96 +41,124 @@ samples = 5000
 
 mse = {
             'cbn cov' : [],
-            'cbn autoenc': []
-            
-            #'rbn cov' : [],
-            #'cbn received' : [],
-            #'rbn received' : [],
-            #'cbn resnet' : [],
-            #'cbn row cov' :  [],
-                    
+            'cbn multi-vec' : [],
+            'cbn resnet' : [],
+            'cbn row cov' :  [],
+            'rbn cov' : [],
+            'rbn single-vec' : [],                    
             }
-    
+
 acc = {
         'cbn cov' : [],
-        #'cbn received' : [],
-            #'cbn resnet' : [],
-            #'cbn row cov' :  [],
-            'cbn autoenc': []
+        'cbn multi-vec' : [],
+            'cbn resnet' : [],
+            'cbn row cov' :  [],
         }
-    
-fp = {
-            'cbn cov' : [],
-            #'cbn received' : [],
-            #'cbn resnet' : [],
-            #'cbn row cov' :  [],
-            'cbn autoenc': []
-            }
-    
-fn = {
-            'cbn cov' : [],
-            #'cbn received' : [],
-            #'cbn resnet' : [],
-            #'cbn row cov' :  [],
-            'cbn autoenc': []
-            }
+
+precision = {
+        'cbn cov' : [],
+        'cbn multi-vec' : [],
+            'cbn resnet' : [],
+            'cbn row cov' :  [],
+        }
+
+recall = {
+        'cbn cov' : [],
+        'cbn multi-vec' : [],
+            'cbn resnet' : [],
+            'cbn row cov' :  [],
+        }
+
+
 
 snrs = [5,10,15,20,25,30]
 
-peak_cut = 0.05
+cutoff = 0.5
+threshold_vec = cutoff
 
 def cbn_cov(model, data_, labels_, snr):
     labels = np.copy(labels_)
     data = np.copy(data_)
     data = cbn_dg.apply_wgn(data, L, snr).reshape((samples, L, N))
     data = cbn_dg.compute_cov(data)/L
-    data = cbn_dg.normalize(data, snr)
+    data = data / np.max(np.abs(data), axis=1).reshape((samples,1))
         
     pred = model.predict(data)
         
-    pred = pred / np.max(pred, axis=1).reshape(samples,1)
-        
+    pred_conv = np.zeros((len(labels), K))
+    labels_conv = np.zeros((len(labels), K))
+    
+    
     for i in range(len(pred)):
-        idx = find_peaks(pred[i], peak_cut)[0]
-        pred[i][:] = 0
-        pred[i][idx] = 1
+        n = int(np.sum(labels[i]))
+        pred_theta = (-pred[i]).argsort()[:n].copy()        
+        pred_theta.sort()
+        pred_conv[i][:n] = pred_theta / 180 #* np.pi - np.pi/2
         
-    mse_ = tf.reduce_mean(tf.keras.losses.mean_squared_error(labels.T, pred.T)).numpy()
-    acc_ = compute_acc(labels, pred, K)
-    fp_ = compute_fp(labels, pred)
-    fn_ = compute_fn(labels, pred)
+        pred[i][pred[i] < cutoff] = 0
+        pred[i][pred[i] >= cutoff] = 1
         
-    mse['cbn cov'].append(mse_)
-    acc['cbn cov'].append(acc_)
-    fp['cbn cov'].append(fp_)
-    fn['cbn cov'].append(fn_)
+        temp = (-labels[i]).argsort()[:n].copy()
+        temp.sort()
+        labels_conv[i][:n] = temp / 180 #* np.pi - np.pi/2
+    
+    #compute_pos_acc(labels, pred, K)
+    p = tf.keras.metrics.Precision(thresholds=threshold_vec)
+    p.update_state(labels, pred)
+    prec = p.result().numpy()
+    
+    r = tf.keras.metrics.Recall(thresholds=threshold_vec)
+    r.update_state(labels, pred)
+    rec = r.result().numpy()
+
+    m = mean_squared_error(labels_conv, pred_conv) / mean_squared_error(labels_conv, np.zeros(labels_conv.shape))
+        
+    mse['cbn cov'].append(m)
+    precision['cbn cov'].append(prec)
+    recall['cbn cov'].append(rec)
 
 def cbn_row_cov(model, data_, labels_, snr):
     labels = np.copy(labels_)
     data = np.copy(data_)
     data = cbn_dg.apply_wgn(data, L, snr).reshape((samples, L, N))
     data = cbn_dg.compute_cov(data)/L
-    data = cbn_dg.normalize(data, snr)
     data[:, list(range(0,N))+list(range(-1,-(N+1), -1))]
+    data = data / np.max(np.abs(data), axis=1).reshape((samples,1))
         
     pred = model.predict(data)
-        
-    pred = pred / np.max(pred, axis=1).reshape(samples,1)
-        
+                
+    pred_conv = np.zeros((len(labels), K))
+    labels_conv = np.zeros((len(labels), K))
+    
+    
     for i in range(len(pred)):
-        idx = find_peaks(pred[i], peak_cut)[0]
-        pred[i][:] = 0
-        pred[i][idx] = 1
+        n = int(np.sum(labels[i]))
+        pred_theta = (-pred[i]).argsort()[:n].copy()        
+        pred_theta.sort()
+        pred_conv[i][:n] = pred_theta / 180 #* np.pi - np.pi/2
         
-    mse_ = tf.reduce_mean(tf.keras.losses.mean_squared_error(labels.T, pred.T)).numpy()
-    acc_ = compute_acc(labels, pred, K)
-    fp_ = compute_fp(labels, pred)
-    fn_ = compute_fn(labels, pred)
+        pred[i][pred[i] < cutoff] = 0
+        pred[i][pred[i] >= cutoff] = 1
         
-    mse['cbn row cov'].append(mse_)
-    acc['cbn row cov'].append(acc_)
-    fp['cbn row cov'].append(fp_)
-    fn['cbn row cov'].append(fn_)
+        temp = (-labels[i]).argsort()[:n].copy()
+        temp.sort()
+        labels_conv[i][:n] = temp / 180 #* np.pi - np.pi/2
+        
+    
+    #acc_pos_ = compute_pos_acc(labels, pred, K)
+    p = tf.keras.metrics.Precision(thresholds=threshold_vec)
+    p.update_state(labels, pred)
+    prec = p.result().numpy()
+    
+    r = tf.keras.metrics.Recall(thresholds=threshold_vec)
+    r.update_state(labels, pred)
+    rec = r.result().numpy()
+    
+    m = mean_squared_error(labels_conv, pred_conv) / mean_squared_error(labels_conv, np.zeros(labels_conv.shape))
+        
+    mse['cbn row cov'].append(m)
+    precision['cbn row cov'].append(prec)
+    recall['cbn row cov'].append(rec)
 
 
 def cbn_resnet(model, data_, labels_, snr):
@@ -137,103 +166,126 @@ def cbn_resnet(model, data_, labels_, snr):
     data = np.copy(data_)
     data = cbn_dg.apply_wgn(data, L, snr).reshape((samples, L, N))
     data = cbn_dg.compute_cov(data)/L
-    data = cbn_dg.normalize(data, snr)
+    data = data / np.max(np.abs(data), axis=1).reshape((samples,1))
         
     pred = model.predict(data)
-        
-    pred = pred / np.max(pred, axis=1).reshape(samples,1)
+            
+    pred_conv = np.zeros((len(labels), K))
+    labels_conv = np.zeros((len(labels), K))
+    
         
     for i in range(len(pred)):
-        idx = find_peaks(pred[i], peak_cut)[0]
-        pred[i][:] = 0
-        pred[i][idx] = 1
+        n = int(np.sum(labels[i]))
+        pred_theta = (-pred[i]).argsort()[:n].copy()        
+        pred_theta.sort()
+        pred_conv[i][:n] = pred_theta / 180 #* np.pi - np.pi/2
         
-    mse_ = tf.reduce_mean(tf.keras.losses.mean_squared_error(labels.T, pred.T)).numpy()
-    acc_ = compute_acc(labels, pred, K)
-    fp_ = compute_fp(labels, pred)
-    fn_ = compute_fn(labels, pred)
+        pred[i][pred[i] < cutoff] = 0
+        pred[i][pred[i] >= cutoff] = 1
+        
+        temp = (-labels[i]).argsort()[:n].copy()
+        temp.sort()
+        labels_conv[i][:n] = temp / 180 #* np.pi - np.pi/2
+        
     
-    mse['cbn resnet'].append(mse_)
-    acc['cbn resnet'].append(acc_)
-    fp['cbn resnet'].append(fp_)
-    fn['cbn resnet'].append(fn_)
+    #acc_pos_ = compute_pos_acc(labels, pred, K)
+    p = tf.keras.metrics.Precision(thresholds=threshold_vec)
+    p.update_state(labels, pred)
+    prec = p.result().numpy()
+    
+    r = tf.keras.metrics.Recall(thresholds=threshold_vec)
+    r.update_state(labels, pred)
+    rec = r.result().numpy()
+    
+    m = mean_squared_error(labels_conv, pred_conv) / mean_squared_error(labels_conv, np.zeros(labels_conv.shape))
+        
+    mse['cbn resnet'].append(m)
+    precision['cbn resnet'].append(prec)
+    recall['cbn resnet'].append(rec)
 
 def cbn_received(model, data_, labels_, snr):
     labels = np.copy(labels_)
     data = np.copy(data_)
-    data = cbn_recv_dg.normalize_add_wgn(data, L, snr)
+    data = cbn_dg.apply_wgn(data, L, snr)
     
-    data[:, list(range(0,N))+list(range(-1,-(N+1), -1))]
-        
+    data = np.concatenate((data.real,data.imag), axis=1)
+    data = data.reshape((samples, 2*N*L))
+    data = data / np.max(np.abs(data), axis=1).reshape((samples,1))
+          
     pred = model.predict(data)
         
-    pred = pred / np.max(pred, axis=1).reshape(samples*L,1)
-        
-    for i in range(len(pred)):
-        idx = find_peaks(pred[i], peak_cut)[0]
-        pred[i][:] = 0
-        pred[i][idx] = 1
-        
-    mse_ = tf.reduce_mean(tf.keras.losses.mean_squared_error(labels.T, pred.T)).numpy()
-    acc_ = compute_acc(labels, pred, K)
-    fp_ = compute_fp(labels, pred) / L
-    fn_ = compute_fn(labels, pred) / L
-        
-    mse['cbn received'].append(mse_)
-    acc['cbn received'].append(acc_)
-    fp['cbn received'].append(fp_)
-    fn['cbn received'].append(fn_)
-
-def cbn_autoenc(model, data_, labels_, snr):
-    labels = np.copy(labels_)
-    data = np.copy(data_)
+    pred_conv = np.zeros((len(labels), K))
+    labels_conv = np.zeros((len(labels), K))
     
-    data = cbn_ae_dg.apply_wgn(data, L, snr).reshape((samples, L*N))
-    data = np.concatenate((data.real,data.imag), axis=1)    
-    data = data / np.max(np.abs(data), axis=1).reshape((samples, 1))
-
-    pred = model.predict(data)
-        
-    pred = pred / np.max(pred, axis=1).reshape(samples,1)
         
     for i in range(len(pred)):
-        idx = find_peaks(pred[i], peak_cut)[0]
-        pred[i][:] = 0
-        pred[i][idx] = 1
+        n = int(np.sum(labels[i]))
+        pred_theta = (-pred[i]).argsort()[:n].copy()        
+        pred_theta.sort()
+        pred_conv[i][:n] = pred_theta / 180 #* np.pi - np.pi/2
         
-    mse_ = tf.reduce_mean(tf.keras.losses.mean_squared_error(labels.T, pred.T)).numpy()
-    acc_ = compute_acc(labels, pred, K)
-    fp_ = compute_fp(labels, pred)
-    fn_ = compute_fn(labels, pred)
+        pred[i][pred[i] < cutoff] = 0
+        pred[i][pred[i] >= cutoff] = 1
         
-    mse['cbn autoenc'].append(mse_)
-    acc['cbn autoenc'].append(acc_)
-    fp['cbn autoenc'].append(fp_)
-    fn['cbn autoenc'].append(fn_)
+        temp = (-labels[i]).argsort()[:n].copy()
+        temp.sort()
+        labels_conv[i][:n] = temp / 180 #* np.pi - np.pi/2
+    
+    #acc_pos_ = compute_pos_acc(labels, pred, K)
+    p = tf.keras.metrics.Precision(thresholds=threshold_vec)
+    p.update_state(labels, pred)
+    prec = p.result().numpy()
+    
+    r = tf.keras.metrics.Recall(thresholds=threshold_vec)
+    r.update_state(labels, pred)
+    rec = r.result().numpy()
+    
+    m = mean_squared_error(labels_conv, pred_conv) / mean_squared_error(labels_conv, np.zeros(labels_conv.shape))
+        
+    mse['cbn multi-vec'].append(m)
+    precision['cbn multi-vec'].append(prec)
+    recall['cbn multi-vec'].append(rec)
+
 
 def rbn_received(model, data_, labels_, snr):
-    labels = labels_.copy()
-    data = data_.copy()
+    labels = np.copy(labels_)
+    labels = np.repeat(labels, L, axis=0).reshape(samples*L,K)
+    data = np.copy(data_)
     
-    rbn_dg.normalize_add_wgn(labels, data, L, snr)
-    pred = model.predict(data)*np.pi - np.pi/2
+    data = cbn_dg.apply_wgn(data, L, snr)
+    data = np.concatenate((data.real,data.imag), axis=1)
+    data = data / np.max(np.abs(data), axis=1).reshape((samples*L,1))
+
+    pred = model.predict(data)#*np.pi - np.pi/2
+    
+    #print(pred[0])
         
-    labels = labels * np.pi - np.pi/2
+    labels = (labels + np.pi/2)/np.pi
     
-    mse_ = tf.reduce_mean(tf.keras.losses.mean_squared_error(labels.T, pred.T)).numpy()
+    m = mean_squared_error(labels, pred) / mean_squared_error(labels, np.zeros(labels.shape))
     
-    mse['rbn received'].append(mse_)
+    mse['rbn single-vec'].append(m)
     
 def rbn_cov(model, data_, labels_, snr):
     labels = labels_.copy()
     data = data_.copy()
     
-    rbn_cov_dg.normalize_add_wgn(labels, data, snr)
-    pred = model.predict(data)*np.pi - np.pi/2
+    data = cbn_dg.apply_wgn(data, L, snr).reshape((samples, L, N))
+    data = cbn_dg.compute_cov(data)/L
+    data = data / np.max(np.abs(data), axis=1).reshape((samples,1))
+    
+    pred = model.predict(data) #- np.pi/2
         
-    labels = labels * np.pi - np.pi/2
+    labels = (labels + np.pi/2)/np.pi
     
-    mse_ = tf.reduce_mean(tf.keras.losses.mean_squared_error(labels.T, pred.T)).numpy()
+    #print(labels[0])
+    #print(pred[0])
     
-    mse['rbn cov'].append(mse_)
+    m = mean_squared_error(labels, pred) / mean_squared_error(labels, np.zeros(labels.shape))
+   
+    #m = np.linalg.norm(labels - pred)**2 / np.linalg.norm(labels)**2
+    #print(m)
+    #m = np.mean(m)
+
+    mse['rbn cov'].append(m)
     

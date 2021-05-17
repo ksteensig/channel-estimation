@@ -16,6 +16,7 @@ class Residual(tf.keras.Model):  #@save
         self.lnorm = tf.keras.layers.LayerNormalization()
 
     def call(self, X):
+        print(X.shape)
         ResX = relu(self.W1(X))
         ResX = self.W2(ResX)
         ResX = Dropout(0.1)(ResX)
